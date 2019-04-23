@@ -35,7 +35,7 @@ gen_yaml_tests: $(PY_SPEC_ALL_TARGETS) $(YAML_TEST_DIR) $(YAML_TEST_TARGETS)
 install_test:
 	cd $(TEST_LIBS_DIR); python3 -m venv venv; . venv/bin/activate; \
 	cd ..; cd $(CONFIG_HELPERS_DIR); pip3 install -e .; \
-	cd ..; cd $(PY_SPEC_DIR); pip3 install -e .[dev];
+	cd $(PY_SPEC_DIR); pip3 install -e .[dev];
 
 test: $(PY_SPEC_ALL_TARGETS)
 	cd $(TEST_LIBS_DIR); . venv/bin/activate; \

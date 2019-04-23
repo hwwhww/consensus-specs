@@ -68,7 +68,7 @@ jobs:
       - save_cached_venv:
           venv_name: v1-pyspec
           reqs_checksum: '{{ checksum "test_libs/pyspec/setup.py" }}'
-          venv_path: ./test_libs/pyspec/venv
+          venv_path: ./test_libs/venv
   test:
     docker:
       - image: circleci/python:3.6

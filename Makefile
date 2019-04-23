@@ -35,14 +35,15 @@ gen_yaml_tests: $(PY_SPEC_ALL_TARGETS) $(YAML_TEST_DIR) $(YAML_TEST_TARGETS)
 install_test:
 	cd $(TEST_LIBS_DIR); python3 -m venv venv; . venv/bin/activate; \
 	cd ..; cd $(CONFIG_HELPERS_DIR); pip3 install -e .; \
-	cd $(PY_SPEC_DIR); pip3 install -e .[dev];
+	cd ../..; cd $(PY_SPEC_DIR); pip3 install -e .[dev];
 
 test: $(PY_SPEC_ALL_TARGETS)
 	cd $(TEST_LIBS_DIR); . venv/bin/activate; \
 	cd ..; cd $(PY_SPEC_DIR); python -m pytest .;
 
 citest: $(PY_SPEC_ALL_TARGETS)
-	cd $(PY_SPEC_DIR); mkdir -p test-reports/eth2spec; . venv/bin/activate; python -m pytest --junitxml=test-reports/eth2spec/test_results.xml .
+	cd $(TEST_LIBS_DIR); . venv/bin/activate; \
+	cd ..; cd $(PY_SPEC_DIR); mkdir -p test-reports/eth2spec; python -m pytest --junitxml=test-reports/eth2spec/test_results.xml .
 
 # "make pyspec" to create the pyspec for all phases.
 pyspec: $(PY_SPEC_ALL_TARGETS)

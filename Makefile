@@ -33,13 +33,13 @@ gen_yaml_tests: $(PY_SPEC_ALL_TARGETS) $(YAML_TEST_DIR) $(YAML_TEST_TARGETS)
 
 # installs the packages to run pyspec tests
 install_test:
-	cd $(TEST_LIBS_DIR); python3 -m venv venv; . venv/bin/activate;
-	cd $(CONFIG_HELPERS_DIR); pip3 install --user -e .;
-	cd $(PY_SPEC_DIR); pip3 install --user -e .[dev];
+	cd $(TEST_LIBS_DIR); python3 -m venv venv; . venv/bin/activate; \
+	cd ..; cd $(CONFIG_HELPERS_DIR); pip3 install -e .; \
+	cd ..; cd $(PY_SPEC_DIR); pip3 install -e .[dev];
 
 test: $(PY_SPEC_ALL_TARGETS)
-	cd $(TEST_LIBS_DIR); . venv/bin/activate;
-	cd $(PY_SPEC_DIR); python -m pytest .;
+	cd $(TEST_LIBS_DIR); . venv/bin/activate; \
+	cd ..; cd $(PY_SPEC_DIR); python -m pytest .;
 
 citest: $(PY_SPEC_ALL_TARGETS)
 	cd $(PY_SPEC_DIR); mkdir -p test-reports/eth2spec; . venv/bin/activate; python -m pytest --junitxml=test-reports/eth2spec/test_results.xml .
@@ -68,7 +68,7 @@ define build_yaml_tests
 	# 3) Install all the necessary requirements
 	# 4) Run the generator. The generator is assumed to have an "main.py" file.
 	# 5) We output to the tests dir (generator program should accept a "-o <filepath>" argument.
-	cd $(GENERATOR_DIR)$(1); python3 -m venv venv; . venv/bin/activate; pip3 install --user -e .[pyspec]; python3 main.py -o $(CURRENT_DIR)/$(YAML_TEST_DIR)$(1) -c $(CURRENT_DIR)/$(CONFIGS_DIR)
+	cd $(GENERATOR_DIR)$(1); python3 -m venv venv; . venv/bin/activate; pip3 install -e .[pyspec]; python3 main.py -o $(CURRENT_DIR)/$(YAML_TEST_DIR)$(1) -c $(CURRENT_DIR)/$(CONFIGS_DIR)
 
 	$(info generator $(1) finished)
 endef

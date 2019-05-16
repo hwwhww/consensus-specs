@@ -1836,3 +1836,13 @@ def process_transfer(state: BeaconState, transfer: Transfer) -> None:
     assert not (0 < state.balances[transfer.sender] < MIN_DEPOSIT_AMOUNT)
     assert not (0 < state.balances[transfer.recipient] < MIN_DEPOSIT_AMOUNT)
 ```
+
+
+```python
+@dataclass
+class InventoryItem:
+    '''Class for keeping track of an item in inventory.'''
+    name: str
+    unit_price: float
+    quantity_on_hand: int = 10
+```

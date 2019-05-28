@@ -19,7 +19,7 @@ def build_deposit_data(state,
                        pubkey: spec.BLSPubkey,
                        withdrawal_cred: spec.Bytes32,
                        privkey: int,
-                       amount: int):
+                       amount: int) -> spec.DepositData:
     deposit_data = spec.DepositData(
         pubkey=pubkey,
         withdrawal_credentials=spec.BLS_WITHDRAWAL_PREFIX_BYTE + withdrawal_cred[1:],

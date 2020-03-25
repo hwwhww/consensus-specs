@@ -1,17 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
-
-- [Ethereum 2.0 Phase 1 -- From Phase 0 to Phase 1](#ethereum-20-phase-1----from-phase-0-to-phase-1)
-  - [Table of contents](#table-of-contents)
-  - [Introduction](#introduction)
-  - [Configuration](#configuration)
-  - [Fork to Phase 1](#fork-to-phase-1)
-    - [Fork trigger.](#fork-trigger)
-    - [Upgrading the state](#upgrading-the-state)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 # Ethereum 2.0 Phase 1 -- From Phase 0 to Phase 1
 
 **Notice**: This document is a work-in-progress for researchers and implementers.
@@ -19,9 +5,17 @@
 ## Table of contents
 
 <!-- TOC -->
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
- TODO
+- [Introduction](#introduction)
+- [Configuration](#configuration)
+- [Fork to Phase 1](#fork-to-phase-1)
+  - [Fork trigger](#fork-trigger)
+  - [Upgrading the state](#upgrading-the-state)
 
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <!-- /TOC -->
 
 ## Introduction
@@ -40,7 +34,7 @@ Warning: this configuration is not definitive.
 
 ## Fork to Phase 1
 
-### Fork trigger.
+### Fork trigger
 
 TBD. Social consensus, along with state conditions such as epoch boundary, finality, deposits, active validator count, etc. may be part of the decision process to trigger the fork.
 
@@ -80,7 +74,7 @@ def upgrade_to_phase1(pre: phase0.BeaconState) -> BeaconState:
                 exit_epoch=phase0_validator.exit_epoch,
                 withdrawable_epoch=phase0_validator.withdrawable_epoch,
                 next_custody_secret_to_reveal=get_custody_period_for_validator(ValidatorIndex(i), epoch),
-                max_reveal_lateness=0,  # TODO custody refactor. Outdated? 
+                max_reveal_lateness=0,  # TODO custody refactor. Outdated?
             ) for i, phase0_validator in enumerate(pre.validators)
         ),
         balances=pre.balances,
@@ -89,7 +83,7 @@ def upgrade_to_phase1(pre: phase0.BeaconState) -> BeaconState:
         # Slashings
         slashings=pre.slashings,
         # Attestations
-        # previous_epoch_attestations is cleared on upgrade. 
+        # previous_epoch_attestations is cleared on upgrade.
         previous_epoch_attestations=List[PendingAttestation, MAX_ATTESTATIONS * SLOTS_PER_EPOCH](),
         # empty in pre state, since the upgrade is performed just after an epoch boundary.
         current_epoch_attestations=List[PendingAttestation, MAX_ATTESTATIONS * SLOTS_PER_EPOCH](),
@@ -110,7 +104,7 @@ def upgrade_to_phase1(pre: phase0.BeaconState) -> BeaconState:
         online_countdown=[ONLINE_PERIOD] * len(pre.validators),  # all online
         current_light_committee=CompactCommittee(),  # computed after state creation
         next_light_committee=CompactCommittee(),
-        # Custody game
+        # custody game
         custody_challenge_index=0,
         # exposed_derived_secrets will fully default to zeroes
     )

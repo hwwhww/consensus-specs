@@ -90,22 +90,22 @@ Configuration is not namespaced. Instead it is strictly an extension;
 ### Misc
 
 | Name | Value | Unit | Duration |
-| - | - | - | - | 
-| `MAX_SHARDS` | `2**10` (= 1024) |
+| - | - | - | - |
+| `MAX_SHARDS` | `2**10` (= 1024) | | |
 | `ONLINE_PERIOD` | `OnlineEpochs(2**3)` (= 8) | online epochs | ~51 min |
-| `LIGHT_CLIENT_COMMITTEE_SIZE` | `2**7` (= 128) |
+| `LIGHT_CLIENT_COMMITTEE_SIZE` | `2**7` (= 128) | | |
 | `LIGHT_CLIENT_COMMITTEE_PERIOD` | `Epoch(2**8)` (= 256) | epochs | ~27 hours |
 | `SHARD_COMMITTEE_PERIOD` | `Epoch(2**8)` (= 256) | epochs | ~27 hours |
-| `MAX_SHARD_BLOCK_SIZE` | `2**20` (= 1,048,576) | |
-| `TARGET_SHARD_BLOCK_SIZE` | `2**18` (= 262,144) | |
-| `SHARD_BLOCK_OFFSETS` | `[1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]` | |
-| `MAX_SHARD_BLOCKS_PER_ATTESTATION` | `len(SHARD_BLOCK_OFFSETS)` | |
+| `MAX_SHARD_BLOCK_SIZE` | `2**20` (= 1,048,576) | bytes |
+| `TARGET_SHARD_BLOCK_SIZE` | `2**18` (= 262,144) | bytes |
+| `SHARD_BLOCK_OFFSETS` | `[1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]` | | |
+| `MAX_SHARD_BLOCKS_PER_ATTESTATION` | `len(SHARD_BLOCK_OFFSETS)` | | |
 | `MAX_GASPRICE` | `Gwei(2**14)` (= 16,384) | Gwei | |
 | `MIN_GASPRICE` | `Gwei(2**5)` (= 32) | Gwei | |
-| `GASPRICE_ADJUSTMENT_COEFFICIENT` | `2**3` (= 8) | |
-| `DOMAIN_SHARD_PROPOSAL` | `DomainType('0x80000000')` | |
-| `DOMAIN_SHARD_COMMITTEE` | `DomainType('0x81000000')` | |
-| `DOMAIN_LIGHT_CLIENT` | `DomainType('0x82000000')` | |
+| `GASPRICE_ADJUSTMENT_COEFFICIENT` | `2**3` (= 8) | | |
+| `DOMAIN_SHARD_PROPOSAL` | `DomainType('0x80000000')` | | |
+| `DOMAIN_SHARD_COMMITTEE` | `DomainType('0x81000000')` | | |
+| `DOMAIN_LIGHT_CLIENT` | `DomainType('0x82000000')` | | |
 
 ## Updated containers
 
@@ -446,7 +446,7 @@ def get_shard_proposer_index(beacon_state: BeaconState, slot: Slot, shard: Shard
 
 ```python
 def get_light_client_committee(beacon_state: BeaconState, epoch: Epoch) -> Sequence[ValidatorIndex]:
-    source_epoch = epoch - epoch % LIGHT_CLIENT_COMMITTEE_PERIOD 
+    source_epoch = epoch - epoch % LIGHT_CLIENT_COMMITTEE_PERIOD
     if source_epoch > 0:
         source_epoch -= LIGHT_CLIENT_COMMITTEE_PERIOD
     active_validator_indices = get_active_validator_indices(beacon_state, source_epoch)
@@ -553,7 +553,6 @@ def is_valid_indexed_attestation(state: BeaconState, indexed_attestation: Indexe
         return bls.AggregateVerify(zip(all_pubkeys, all_signing_roots), signature=attestation.signature)
 ```
 
-
 ### Block processing
 
 ```python
@@ -565,7 +564,6 @@ def process_block(state: BeaconState, block: BeaconBlock) -> None:
     process_light_client_signatures(state, block.body)
     process_operations(state, block.body)
 ```
-
 
 #### Operations
 
@@ -857,13 +855,12 @@ def process_light_client_signatures(state: BeaconState, block_body: BeaconBlockB
             total_reward += get_base_reward(state, participant_index)
 
     increase_balance(state, get_beacon_proposer_index(state), Gwei(total_reward // PROPOSER_REWARD_QUOTIENT))
-    
+
     slot = get_previous_slot(state.slot)
-    signing_root = compute_signing_root(get_block_root_at_slot(state, slot), 
+    signing_root = compute_signing_root(get_block_root_at_slot(state, slot),
                                         get_domain(state, DOMAIN_LIGHT_CLIENT, compute_epoch_at_slot(slot)))
     assert bls.FastAggregateVerify(signer_pubkeys, signing_root, signature=block_body.light_client_signature)
 ```
-
 
 ### Epoch transition
 
@@ -884,7 +881,7 @@ def process_epoch(state: BeaconState) -> None:
 
 #### Custody game updates
 
-`process_reveal_deadlines` and `process_custody_final_updates` are defined in [the Custody Game spec](./1_custody-game.md), 
+`process_reveal_deadlines` and `process_custody_final_updates` are defined in [the Custody Game spec](./1_custody-game.md).
 
 #### Online-tracking
 

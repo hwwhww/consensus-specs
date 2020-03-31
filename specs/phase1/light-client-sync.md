@@ -86,8 +86,8 @@ def get_persistent_committee_pubkeys_and_balances(memory: LightClientMemory,
     """
     Return pubkeys and balances for the persistent committee at ``epoch``.
     """
-    current_period = compute_epoch_at_slot(memory.header.slot) // EPOCHS_PER_SHARD_PERIOD
-    next_period = epoch // EPOCHS_PER_SHARD_PERIOD
+    current_period = compute_epoch_at_slot(memory.header.slot) // LIGHT_CLIENT_COMMITTEE_PERIOD
+    next_period = epoch // LIGHT_CLIENT_COMMITTEE_PERIOD
     assert next_period in (current_period, current_period + 1)
     if next_period == current_period:
         earlier_committee, later_committee = memory.previous_committee, memory.current_committee
@@ -98,12 +98,12 @@ def get_persistent_committee_pubkeys_and_balances(memory: LightClientMemory,
     balances = []
     for pubkey, compact_validator in zip(earlier_committee.pubkeys, earlier_committee.compact_validators):
         index, slashed, balance = unpack_compact_validator(compact_validator)
-        if epoch % EPOCHS_PER_SHARD_PERIOD < index % EPOCHS_PER_SHARD_PERIOD:
+        if epoch % LIGHT_CLIENT_COMMITTEE_PERIOD < index % LIGHT_CLIENT_COMMITTEE_PERIOD:
             pubkeys.append(pubkey)
             balances.append(balance)
     for pubkey, compact_validator in zip(later_committee.pubkeys, later_committee.compact_validators):
         index, slashed, balance = unpack_compact_validator(compact_validator)
-        if epoch % EPOCHS_PER_SHARD_PERIOD >= index % EPOCHS_PER_SHARD_PERIOD:
+        if epoch % LIGHT_CLIENT_COMMITTEE_PERIOD >= index % LIGHT_CLIENT_COMMITTEE_PERIOD:
             pubkeys.append(pubkey)
             balances.append(balance)
     return pubkeys, balances
@@ -116,9 +116,9 @@ The state of a light client is stored in a `memory` object of type `LightClientM
 ```python
 def update_memory(memory: LightClientMemory, update: LightClientUpdate) -> None:
     # Verify the update does not skip a period
-    current_period = compute_epoch_at_slot(memory.header.slot) // EPOCHS_PER_SHARD_PERIOD
+    current_period = compute_epoch_at_slot(memory.header.slot) // LIGHT_CLIENT_COMMITTEE_PERIOD
     next_epoch = compute_epoch_of_shard_slot(update.header.slot)
-    next_period = next_epoch // EPOCHS_PER_SHARD_PERIOD
+    next_period = next_epoch // LIGHT_CLIENT_COMMITTEE_PERIOD
     assert next_period in (current_period, current_period + 1)  
 
     # Verify update header against shard block root and header branch
@@ -159,7 +159,7 @@ def update_memory(memory: LightClientMemory, update: LightClientUpdate) -> None:
 
 ## Data overhead
 
-Once every `EPOCHS_PER_SHARD_PERIOD` epochs (~27 hours) a light client downloads a `LightClientUpdate` object:
+Once every `LIGHT_CLIENT_COMMITTEE_PERIOD` epochs (~27 hours) a light client downloads a `LightClientUpdate` object:
 
 * `shard_block_root`: 32 bytes
 * `fork_version`: 4 bytes
@@ -172,4 +172,4 @@ Once every `EPOCHS_PER_SHARD_PERIOD` epochs (~27 hours) a light client downloads
 
 The total overhead is 8,124 bytes, or ~0.083 bytes per second. The Bitcoin SPV equivalent is 80 bytes per ~560 seconds, or ~0.143 bytes per second. Various compression optimisations (similar to [these](https://github.com/RCasatta/compressedheaders)) are possible.
 
-A light client can choose to update the header (without updating the committee) more frequently than once every `EPOCHS_PER_SHARD_PERIOD` epochs at a cost of 32 + 4 + 16 + 96 + 200 + 128 = 476 bytes per update.
+A light client can choose to update the header (without updating the committee) more frequently than once every `LIGHT_CLIENT_COMMITTEE_PERIOD` epochs at a cost of 32 + 4 + 16 + 96 + 200 + 128 = 476 bytes per update.

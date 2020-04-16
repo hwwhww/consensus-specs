@@ -61,7 +61,7 @@ def shard_state_transition(beacon_state: BeaconState,
 def compute_shard_transition_data(beacon_state: BeaconState,
                                   shard_state: ShardState,
                                   beacon_parent_root: Root,
-                                  shard_body_root: Root) -> Root:
+                                  shard_body_root: Root) -> Bytes32:
     return hash(
         hash_tree_root(shard_state) + beacon_parent_root + shard_body_root
     )

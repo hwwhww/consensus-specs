@@ -68,6 +68,20 @@ def compute_shard_transition_data(beacon_state: BeaconState,
 ```
 
 ```python
+def verify_shard_block_message(beacon_state: BeaconState,
+                               shard_state: ShardState,
+                               block: ShardBlock,
+                               slot: Slot,
+                               shard: Shard) -> bool:
+    assert block.shard_parent_root == shard_state.latest_block_root
+    assert block.beacon_parent_root == get_block_root_at_slot(beacon_state, slot)
+    assert block.slot == slot
+    assert block.proposer_index == get_shard_proposer_index(beacon_state, slot, shard)
+    assert 0 < len(block.body) <= MAX_SHARD_BLOCK_SIZE
+    return True
+```
+
+```python
 def verify_shard_block_signature(beacon_state: BeaconState,
                                  signed_block: SignedShardBlock) -> bool:
     proposer = beacon_state.validators[signed_block.message.proposer_index]
@@ -90,13 +104,13 @@ TODO. The intent is to have a single universal fraud proof type, which contains 
 Call the following function to verify the proof:
 
 ```python
-def verify_fraud_proof(beacon_state: BeaconState,
-                       attestation: Attestation,
-                       offset_index: uint64,
-                       transition: ShardTransition,
-                       signed_block: SignedShardBlock,
-                       subkey: BLSPubkey,
-                       beacon_parent_block: BeaconBlock) -> bool:
+def is_valid_fraud_proof(beacon_state: BeaconState,
+                         attestation: Attestation,
+                         offset_index: uint64,
+                         transition: ShardTransition,
+                         signed_block: SignedShardBlock,
+                         subkey: BLSPubkey,
+                         beacon_parent_block: BeaconBlock) -> bool:
     # 1. Check if `custody_bits[offset_index][j] != generate_custody_bit(subkey, block_contents)` for any `j`.
     shard = get_shard(beacon_state, attestation)
     slot = attestation.data.slot
@@ -153,21 +167,20 @@ def get_proposal_choices_at_slot(beacon_state: BeaconState,
                                  slot: Slot,
                                  shard: Shard,
                                  shard_blocks: Sequence[SignedShardBlock],
-                                 validate_result: bool=True) -> Sequence[SignedShardBlock]:
+                                 validate_signature: bool=True) -> Sequence[SignedShardBlock]:
     """
     Return the valid shard blocks at the given ``slot``.
     Note that this function doesn't change the state.
     """
     choices = []
-    proposer_index = get_shard_proposer_index(beacon_state, slot, shard)
     shard_blocks_at_slot = [block for block in shard_blocks if block.message.slot == slot]
     for block in shard_blocks_at_slot:
         temp_shard_state = shard_state.copy()  # Not doing the actual state updates here.
         # Try to apply state transition to temp_shard_state.
         try:
-            # Verify the proposer_index and signature
-            assert block.message.proposer_index == proposer_index
-            if validate_result:
+            # Verify block message and signature
+            assert verify_shard_block_message(beacon_state, temp_shard_state, block.message, slot, shard)
+            if validate_signature:
                 assert verify_shard_block_signature(beacon_state, block)
 
             shard_state_transition(
@@ -189,7 +202,7 @@ def get_proposal_at_slot(beacon_state: BeaconState,
                          slot: Shard,
                          shard: Shard,
                          shard_blocks: Sequence[SignedShardBlock],
-                         validate_result: bool=True) -> Tuple[SignedShardBlock, ShardState]:
+                         validate_signature: bool=True) -> Tuple[SignedShardBlock, ShardState]:
     """
     Return ``proposal``, ``shard_state`` of the given ``slot``.
     Note that this function doesn't change the state.
@@ -202,7 +215,7 @@ def get_proposal_at_slot(beacon_state: BeaconState,
         slot=slot,
         shard=shard,
         shard_blocks=shard_blocks,
-        validate_result=validate_result,
+        validate_signature=validate_signature,
     )
     if len(choices) == 0:
         block_header = ShardBlock(
@@ -233,7 +246,7 @@ def get_shard_state_transition_result(
     beacon_state: BeaconState,
     shard: Shard,
     shard_blocks: Sequence[SignedShardBlock],
-    validate_result: bool=True,
+    validate_signature: bool=True,
 ) -> Tuple[Sequence[SignedShardBlock], Sequence[ShardState], Sequence[Root]]:
     proposals = []
     shard_states = []
@@ -245,7 +258,7 @@ def get_shard_state_transition_result(
             slot=slot,
             shard=shard,
             shard_blocks=shard_blocks,
-            validate_result=validate_result,
+            validate_signature=validate_signature,
         )
         shard_states.append(shard_state)
         proposals.append(proposal)

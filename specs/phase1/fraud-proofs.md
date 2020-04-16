@@ -122,16 +122,11 @@ def is_valid_fraud_proof(beacon_state: BeaconState,
     # 2. Check if the shard state transition result is wrong between
     # `transition.shard_states[offset_index - 1]` to `transition.shard_states[offset_index]`.
     if offset_index == 0:
-        shard_state = beacon_parent_block.shard_transitions[shard].shard_states[-1]
+        shard_state = beacon_parent_block.shard_transitions[shard].shard_states[-1].copy()
     else:
         shard_state = transition.shard_states[offset_index - 1].copy()  # Not doing the actual state updates here.
 
-    shard_state_transition(
-        beacon_state=beacon_state,
-        shard_state=shard_state,
-        slot=slot,
-        signed_block=signed_block,
-    )
+    shard_state_transition(beacon_state, shard_state, slot, signed_block)
     if shard_state.data != transition.shard_states[offset_index].data:
         return True
 
@@ -183,12 +178,7 @@ def get_proposal_choices_at_slot(beacon_state: BeaconState,
             if validate_signature:
                 assert verify_shard_block_signature(beacon_state, block)
 
-            shard_state_transition(
-                beacon_state=beacon_state,
-                shard_state=temp_shard_state,
-                slot=slot,
-                signed_block=block,
-            )
+            shard_state_transition(beacon_state, temp_shard_state, slot, block)
         except Exception:
             pass  # TODO: throw error in the test helper
         else:
@@ -231,12 +221,7 @@ def get_proposal_at_slot(beacon_state: BeaconState,
         proposal = get_winning_proposal(beacon_state, choices)
 
     # Apply state transition
-    shard_state_transition(
-        beacon_state=beacon_state,
-        shard_state=shard_state,
-        slot=slot,
-        signed_block=proposal,
-    )
+    shard_state_transition(beacon_state, shard_state, slot, proposal)
 
     return proposal, shard_state
 ```

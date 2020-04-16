@@ -716,7 +716,6 @@ def apply_shard_transition(state: BeaconState, shard: Shard, transition: ShardTr
     proposers = []
     prev_gasprice = state.shard_states[shard].gasprice
     shard_parent_root = state.shard_states[shard].latest_block_root
-    beacon_parent_root = get_block_root_at_slot(state, get_previous_slot(state.slot))
     for i in range(len(offset_slots)):
         shard_block_length = transition.shard_block_lengths[i]
         is_empty_proposal = shard_block_length == 0
@@ -725,7 +724,7 @@ def apply_shard_transition(state: BeaconState, shard: Shard, transition: ShardTr
         # Reconstruct shard headers
         header = ShardBlockHeader(
             shard_parent_root=shard_parent_root,
-            beacon_parent_root=beacon_parent_root,
+            beacon_parent_root=get_block_root_at_slot(state, offset_slots[i]),
             proposer_index=proposal_index,
             slot=offset_slots[i],
             body_root=transition.shard_data_roots[i]
@@ -736,10 +735,11 @@ def apply_shard_transition(state: BeaconState, shard: Shard, transition: ShardTr
             # Only add non-empty signature
             headers.append(header)
             proposers.append(proposal_index)
-            # Verify correct calculation of gas prices and slots
-            assert shard_state.gasprice == compute_updated_gasprice(prev_gasprice, shard_block_length)
-            assert shard_state.slot == offset_slots[i]
-            prev_gasprice = shard_state.gasprice
+
+        # Verify correct calculation of gas prices and slots
+        assert shard_state.gasprice == compute_updated_gasprice(prev_gasprice, shard_block_length)
+        assert shard_state.slot == offset_slots[i]
+        prev_gasprice = shard_state.gasprice
 
     pubkeys = [state.validators[proposer].pubkey for proposer in proposers]
     signing_roots = [

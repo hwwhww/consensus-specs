@@ -37,7 +37,6 @@ This document describes the shard transition function and fraud proofs as part o
 ```python
 def shard_state_transition(beacon_state: BeaconState,
                            shard_state: ShardState,
-                           slot: Slot,
                            signed_block: SignedShardBlock) -> None:
     # Update shard state
     prev_gasprice = shard_state.gasprice
@@ -53,7 +52,7 @@ def shard_state_transition(beacon_state: BeaconState,
         signed_block.message.body,
     )
     shard_state.gasprice = compute_updated_gasprice(prev_gasprice, len(signed_block.message.body))
-    shard_state.slot = slot
+    shard_state.slot = signed_block.message.slot
     shard_state.latest_block_root = latest_block_root
 ```
 
@@ -113,7 +112,6 @@ def is_valid_fraud_proof(beacon_state: BeaconState,
                          beacon_parent_block: BeaconBlock) -> bool:
     # 1. Check if `custody_bits[offset_index][j] != generate_custody_bit(subkey, block_contents)` for any `j`.
     shard = get_shard(beacon_state, attestation)
-    slot = attestation.data.slot
     custody_bits = attestation.custody_bits_blocks
     for j in range(custody_bits[offset_index]):
         if custody_bits[offset_index][j] != generate_custody_bit(subkey, signed_block):
@@ -126,7 +124,7 @@ def is_valid_fraud_proof(beacon_state: BeaconState,
     else:
         shard_state = transition.shard_states[offset_index - 1].copy()  # Not doing the actual state updates here.
 
-    shard_state_transition(beacon_state, shard_state, slot, signed_block)
+    shard_state_transition(beacon_state, shard_state, signed_block)
     if shard_state.data != transition.shard_states[offset_index].data:
         return True
 
@@ -178,7 +176,7 @@ def get_proposal_choices_at_slot(beacon_state: BeaconState,
             if validate_signature:
                 assert verify_shard_block_signature(beacon_state, block)
 
-            shard_state_transition(beacon_state, temp_shard_state, slot, block)
+            shard_state_transition(beacon_state, temp_shard_state, block)
         except Exception:
             pass  # TODO: throw error in the test helper
         else:
@@ -197,7 +195,6 @@ def get_proposal_at_slot(beacon_state: BeaconState,
     Return ``proposal``, ``shard_state`` of the given ``slot``.
     Note that this function doesn't change the state.
     """
-    proposer_index = get_shard_proposer_index(beacon_state, slot, shard)
     shard_state = shard_state.copy()  # Don't update the given shard_state
     choices = get_proposal_choices_at_slot(
         beacon_state=beacon_state,
@@ -208,20 +205,15 @@ def get_proposal_at_slot(beacon_state: BeaconState,
         validate_signature=validate_signature,
     )
     if len(choices) == 0:
-        block_header = ShardBlock(
-            shard_parent_root=shard_state.latest_block_root,
-            beacon_parent_root=get_block_root_at_slot(beacon_state, slot),
-            slot=slot,
-            proposer_index=proposer_index,
-        )
-        proposal = SignedShardBlock(message=block_header)
+        block = ShardBlock(slot=slot)
+        proposal = SignedShardBlock(message=block)
     elif len(choices) == 1:
         proposal = choices[0]
     else:
         proposal = get_winning_proposal(beacon_state, choices)
 
     # Apply state transition
-    shard_state_transition(beacon_state, shard_state, slot, proposal)
+    shard_state_transition(beacon_state, shard_state, proposal)
 
     return proposal, shard_state
 ```

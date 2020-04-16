@@ -712,7 +712,6 @@ def apply_shard_transition(state: BeaconState, shard: Shard, transition: ShardTr
     assert transition.start_slot == offset_slots[0]
 
     headers = []
-    header = ShardBlockHeader()
     proposers = []
     prev_gasprice = state.shard_states[shard].gasprice
     shard_parent_root = state.shard_states[shard].latest_block_root
@@ -720,19 +719,17 @@ def apply_shard_transition(state: BeaconState, shard: Shard, transition: ShardTr
         shard_block_length = transition.shard_block_lengths[i]
         is_empty_proposal = shard_block_length == 0
         shard_state = transition.shard_states[i]
-        proposal_index = get_shard_proposer_index(state, offset_slots[i], shard)
-        # Reconstruct shard headers
-        header = ShardBlockHeader(
-            shard_parent_root=shard_parent_root,
-            beacon_parent_root=get_block_root_at_slot(state, offset_slots[i]),
-            proposer_index=proposal_index,
-            slot=offset_slots[i],
-            body_root=transition.shard_data_roots[i]
-        )
-        shard_parent_root = hash_tree_root(header)
-
         if not is_empty_proposal:
-            # Only add non-empty signature
+            proposal_index = get_shard_proposer_index(state, offset_slots[i], shard)
+            # Reconstruct shard headers
+            header = ShardBlockHeader(
+                shard_parent_root=shard_parent_root,
+                beacon_parent_root=get_block_root_at_slot(state, offset_slots[i]),
+                proposer_index=proposal_index,
+                slot=offset_slots[i],
+                body_root=transition.shard_data_roots[i]
+            )
+            shard_parent_root = hash_tree_root(header)
             headers.append(header)
             proposers.append(proposal_index)
 

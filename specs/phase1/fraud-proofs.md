@@ -101,7 +101,7 @@ def verify_fraud_proof(beacon_state: BeaconState,
         beacon_parent_root=hash_tree_root(beacon_parent_block),
         signed_block=signed_block,
     )
-    if shard_state.latest_block_root != transition.shard_states[offset_index].data:
+    if shard_state.data != transition.shard_states[offset_index].data:
         return True
 
     return False
@@ -145,7 +145,7 @@ def is_empty_body(proposal: ShardBlock) -> bool:
 ```
 
 ```python
-def compute_shard_data_roots(proposals: Sequence[SignedShardBlock]) -> Sequence[Root]:
+def compute_shard_body_roots(proposals: Sequence[SignedShardBlock]) -> Sequence[Root]:
     return [hash_tree_root(proposal.message.body) for proposal in proposals]
 ```
 
@@ -256,7 +256,7 @@ def get_shard_state_transition_result(
         shard_states.append(shard_state)
         proposals.append(proposal)
 
-    shard_data_roots = compute_shard_data_roots(proposals)
+    shard_data_roots = compute_shard_body_roots(proposals)
 
     return proposals, shard_states, shard_data_roots
 ```

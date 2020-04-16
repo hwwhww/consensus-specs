@@ -39,6 +39,7 @@
     - [`committee_to_compact_committee`](#committee_to_compact_committee)
     - [`compute_shard_from_committee_index`](#compute_shard_from_committee_index)
     - [`compute_offset_slots`](#compute_offset_slots)
+    - [`compute_updated_gasprice`](#compute_updated_gasprice)
   - [Beacon state accessors](#beacon-state-accessors)
     - [`get_active_shard_count`](#get_active_shard_count)
     - [`get_online_validator_indices`](#get_online_validator_indices)
@@ -46,7 +47,6 @@
     - [`get_light_client_committee`](#get_light_client_committee)
     - [`get_shard_proposer_index`](#get_shard_proposer_index)
     - [`get_indexed_attestation`](#get_indexed_attestation)
-    - [`get_updated_gasprice`](#get_updated_gasprice)
     - [`get_start_shard`](#get_start_shard)
     - [`get_shard`](#get_shard)
     - [`get_latest_slot_for_shard`](#get_latest_slot_for_shard)
@@ -439,6 +439,20 @@ def compute_offset_slots(start_slot: Slot, end_slot: Slot) -> Sequence[Slot]:
     return [Slot(start_slot + x) for x in SHARD_BLOCK_OFFSETS if start_slot + x < end_slot]
 ```
 
+#### `compute_updated_gasprice`
+
+```python
+def compute_updated_gasprice(prev_gasprice: Gwei, length: uint8) -> Gwei:
+    if length > TARGET_SHARD_BLOCK_SIZE:
+        delta = (prev_gasprice * (length - TARGET_SHARD_BLOCK_SIZE)
+                 // TARGET_SHARD_BLOCK_SIZE // GASPRICE_ADJUSTMENT_COEFFICIENT)
+        return min(prev_gasprice + delta, MAX_GASPRICE)
+    else:
+        delta = (prev_gasprice * (TARGET_SHARD_BLOCK_SIZE - length)
+                 // TARGET_SHARD_BLOCK_SIZE // GASPRICE_ADJUSTMENT_COEFFICIENT)
+        return max(prev_gasprice, MIN_GASPRICE + delta) - delta
+```
+
 ### Beacon state accessors
 
 #### `get_active_shard_count`
@@ -510,20 +524,6 @@ def get_indexed_attestation(beacon_state: BeaconState, attestation: Attestation)
         committee=committee,
         attestation=attestation,
     )
-```
-
-#### `get_updated_gasprice`
-
-```python
-def get_updated_gasprice(prev_gasprice: Gwei, length: uint8) -> Gwei:
-    if length > TARGET_SHARD_BLOCK_SIZE:
-        delta = (prev_gasprice * (length - TARGET_SHARD_BLOCK_SIZE) 
-                 // TARGET_SHARD_BLOCK_SIZE // GASPRICE_ADJUSTMENT_COEFFICIENT)
-        return min(prev_gasprice + delta, MAX_GASPRICE)
-    else:
-        delta = (prev_gasprice * (TARGET_SHARD_BLOCK_SIZE - length)
-                 // TARGET_SHARD_BLOCK_SIZE // GASPRICE_ADJUSTMENT_COEFFICIENT)
-        return max(prev_gasprice, MIN_GASPRICE + delta) - delta
 ```
 
 #### `get_start_shard`
@@ -617,7 +617,6 @@ def is_valid_indexed_attestation(state: BeaconState, indexed_attestation: Indexe
         return bls.AggregateVerify(zip(all_pubkeys, all_signing_roots), signature=attestation.signature)
 ```
 
-
 ### Block processing
 
 ```python
@@ -629,7 +628,6 @@ def process_block(state: BeaconState, block: BeaconBlock) -> None:
     process_light_client_signatures(state, block.body)
     process_operations(state, block.body)
 ```
-
 
 #### Operations
 
@@ -721,7 +719,7 @@ def apply_shard_transition(state: BeaconState, shard: Shard, transition: ShardTr
     beacon_parent_root = get_block_root_at_slot(state, get_previous_slot(state.slot))
     for i in range(len(offset_slots)):
         shard_block_length = transition.shard_block_lengths[i]
-        is_empty_proposal = (shard_block_length == 0)
+        is_empty_proposal = shard_block_length == 0
         shard_state = transition.shard_states[i]
         proposal_index = get_shard_proposer_index(state, offset_slots[i], shard)
         # Reconstruct shard headers
@@ -739,7 +737,7 @@ def apply_shard_transition(state: BeaconState, shard: Shard, transition: ShardTr
             headers.append(header)
             proposers.append(proposal_index)
             # Verify correct calculation of gas prices and slots
-            assert shard_state.gasprice == get_updated_gasprice(prev_gasprice, shard_block_length)
+            assert shard_state.gasprice == compute_updated_gasprice(prev_gasprice, shard_block_length)
             assert shard_state.slot == offset_slots[i]
             prev_gasprice = shard_state.gasprice
 
@@ -753,7 +751,6 @@ def apply_shard_transition(state: BeaconState, shard: Shard, transition: ShardTr
 
     # Save updated state
     state.shard_states[shard] = transition.shard_states[len(transition.shard_states) - 1]
-    assert state.slot > 0
     state.shard_states[shard].slot = state.slot - 1
 ```
 

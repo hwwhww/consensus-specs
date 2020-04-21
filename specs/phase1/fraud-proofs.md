@@ -45,7 +45,7 @@ def shard_state_transition(beacon_state: BeaconState,
     else:
         latest_block_root = hash_tree_root(block)
 
-    shard_state.data = compute_shard_transition_data(
+    shard_state.transition_digest = compute_shard_transition_digest(
         beacon_state,
         shard_state,
         block.beacon_parent_root,
@@ -57,10 +57,11 @@ def shard_state_transition(beacon_state: BeaconState,
 ```
 
 ```python
-def compute_shard_transition_data(beacon_state: BeaconState,
-                                  shard_state: ShardState,
-                                  beacon_parent_root: Root,
-                                  shard_body_root: Root) -> Bytes32:
+def compute_shard_transition_digest(beacon_state: BeaconState,
+                                    shard_state: ShardState,
+                                    beacon_parent_root: Root,
+                                    shard_body_root: Root) -> Bytes32:
+    # TODO: use SSZ hash tree root
     return hash(
         hash_tree_root(shard_state) + beacon_parent_root + shard_body_root
     )
@@ -125,7 +126,7 @@ def is_valid_fraud_proof(beacon_state: BeaconState,
         shard_state = transition.shard_states[offset_index - 1].copy()  # Not doing the actual state updates here.
 
     shard_state_transition(beacon_state, shard_state, block)
-    if shard_state.data != transition.shard_states[offset_index].data:
+    if shard_state.transition_digest != transition.shard_states[offset_index].transition_digest:
         return True
 
     return False

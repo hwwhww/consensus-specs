@@ -33,7 +33,7 @@
   - [`AttestationCustodyBitWrapper`](#attestationcustodybitwrapper)
 - [Helper functions](#helper-functions)
   - [Misc](#misc-1)
-    - [`get_previous_slot`](#get_previous_slot)
+    - [`compute_previous_slot`](#compute_previous_slot)
     - [`pack_compact_validator`](#pack_compact_validator)
     - [`unpack_compact_validator`](#unpack_compact_validator)
     - [`committee_to_compact_committee`](#committee_to_compact_committee)
@@ -369,10 +369,10 @@ class AttestationCustodyBitWrapper(Container):
 
 ### Misc
 
-#### `get_previous_slot`
+#### `compute_previous_slot`
 
 ```python
-def get_previous_slot(slot: Slot) -> Slot:
+def compute_previous_slot(slot: Slot) -> Slot:
     if slot > 0:
         return Slot(slot - 1)
     else:
@@ -684,7 +684,7 @@ def validate_attestation(state: BeaconState, attestation: Attestation) -> None:
         # Correct data root count
         assert len(attestation.custody_bits_blocks) == len(get_offset_slots(state, shard))
         # Correct parent block root
-        assert data.beacon_block_root == get_block_root_at_slot(state, get_previous_slot(state.slot))
+        assert data.beacon_block_root == get_block_root_at_slot(state, compute_previous_slot(state.slot))
     # Type 2: no shard transition, no custody bits
     else:
         # Ensure delayed attestation
@@ -920,7 +920,7 @@ def process_light_client_signatures(state: BeaconState, block_body: BeaconBlockB
 
     increase_balance(state, get_beacon_proposer_index(state), Gwei(total_reward // PROPOSER_REWARD_QUOTIENT))
 
-    slot = get_previous_slot(state.slot)
+    slot = compute_previous_slot(state.slot)
     signing_root = compute_signing_root(get_block_root_at_slot(state, slot),
                                         get_domain(state, DOMAIN_LIGHT_CLIENT, compute_epoch_at_slot(slot)))
     assert bls.FastAggregateVerify(signer_pubkeys, signing_root, signature=block_body.light_client_signature)

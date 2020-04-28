@@ -66,22 +66,19 @@ def build_attestation_data(spec, state, slot, index, shard_transition=None):
         source_epoch = state.current_justified_checkpoint.epoch
         source_root = state.current_justified_checkpoint.root
 
-    if spec.fork == PHASE1 and shard_transition is not None:
-        shard_transition_root = shard_transition.hash_tree_root()
-        head_shard_root = shard_transition.shard_data_roots[len(shard_transition.shard_data_roots) - 1]
-    else:
-        shard_transition_root = spec.Root()
-        head_shard_root = spec.Root()
-
-    return spec.AttestationData(
+    attestation_data = spec.AttestationData(
         slot=slot,
         index=index,
         beacon_block_root=block_root,
         source=spec.Checkpoint(epoch=source_epoch, root=source_root),
         target=spec.Checkpoint(epoch=spec.compute_epoch_at_slot(slot), root=epoch_boundary_root),
-        head_shard_root=head_shard_root,
-        shard_transition_root=shard_transition_root,
     )
+
+    if spec.fork == PHASE1 and shard_transition is not None:
+        lastest_shard_data_root_index = len(shard_transition.shard_data_roots) - 1
+        attestation_data.head_shard_root = shard_transition.shard_data_roots[lastest_shard_data_root_index]
+        attestation_data.shard_transition_root = shard_transition.hash_tree_root()
+    return attestation_data
 
 
 def convert_to_valid_on_time_attestation(spec, state, attestation, signed=False):

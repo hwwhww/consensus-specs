@@ -24,7 +24,7 @@ def test_basic_crosslinks(spec, state):
 
     committee_index = spec.CommitteeIndex(0)
     shard = spec.compute_shard_from_committee_index(state, committee_index, state.slot)
-    body = b'1' * spec.MAX_SHARD_BLOCK_SIZE
+    body = b'\x56' * spec.MAX_SHARD_BLOCK_SIZE
     shard_block = build_shard_block(spec, state, shard, body=body, slot=state.slot, signed=True)
     shard_blocks = [shard_block]
 
@@ -68,7 +68,7 @@ def test_multiple_offset_slots(spec, state):
 
     committee_index = spec.CommitteeIndex(0)
     shard = spec.compute_shard_from_committee_index(state, committee_index, state.slot)
-    body = b'1' * spec.MAX_SHARD_BLOCK_SIZE
+    body = b'\x56' * spec.MAX_SHARD_BLOCK_SIZE
     shard_block = build_shard_block(spec, state, shard, body=body, slot=state.slot, signed=True)
     shard_blocks = [shard_block]
 

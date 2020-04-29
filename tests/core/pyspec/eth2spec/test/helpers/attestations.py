@@ -74,17 +74,26 @@ def build_attestation_data(spec, state, slot, index, shard_transition=None):
         target=spec.Checkpoint(epoch=spec.compute_epoch_at_slot(slot), root=epoch_boundary_root),
     )
 
-    if spec.fork == PHASE1 and shard_transition is not None:
-        lastest_shard_data_root_index = len(shard_transition.shard_data_roots) - 1
-        attestation_data.head_shard_root = shard_transition.shard_data_roots[lastest_shard_data_root_index]
-        attestation_data.shard_transition_root = shard_transition.hash_tree_root()
+    if spec.fork == PHASE1:
+        if shard_transition is not None:
+            lastest_shard_data_root_index = len(shard_transition.shard_data_roots) - 1
+            attestation_data.head_shard_root = shard_transition.shard_data_roots[lastest_shard_data_root_index]
+            attestation_data.shard_transition_root = shard_transition.hash_tree_root()
+        else:
+            # No shard_transition
+            shard = spec.get_shard(state, spec.Attestation(data=attestation_data))
+            attestation_data.head_shard_root = state.shard_states[shard].transition_digest
+            attestation_data.shard_transition_root = spec.Root()
     return attestation_data
 
 
 def convert_to_valid_on_time_attestation(spec, state, attestation, signed=False):
     shard = spec.get_shard(state, attestation)
-    offset_slots = spec.compute_offset_slots(spec.get_latest_slot_for_shard(state, shard), state.slot + 1)
-    for offset_slot in offset_slots:
+    offset_slots = spec.compute_offset_slots(
+        spec.get_latest_slot_for_shard(state, shard),
+        attestation.data.slot + spec.MIN_ATTESTATION_INCLUSION_DELAY,
+    )
+    for _ in offset_slots:
         attestation.custody_bits_blocks.append(
             Bitlist[spec.MAX_VALIDATORS_PER_COMMITTEE]([0 for _ in attestation.aggregation_bits])
         )
@@ -294,6 +303,8 @@ def next_epoch_with_attestations(spec,
                 prev_attestation = get_valid_attestation(
                     spec, post_state, slot_to_attest, index=index, signed=True, on_time=False)
                 block.body.attestations.append(prev_attestation)
+            if spec.fork == PHASE1:
+                block.body.shard_transitions = [spec.ShardTransition()] * spec.MAX_SHARDS
 
         signed_block = state_transition_and_sign_block(spec, post_state, block)
         signed_blocks.append(signed_block)

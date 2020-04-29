@@ -556,6 +556,30 @@ def get_offset_slots(state: BeaconState, shard: Shard) -> Sequence[Slot]:
 
 ### Predicates
 
+#### `is_shard_attestation`
+
+```python
+def is_shard_attestation(state: BeaconState,
+                         attestation: Attestation,
+                         shard_transition: ShardTransition,
+                         shard: Shard,
+                         committee_index: CommitteeIndex) -> bool:
+    if not (
+        attestation.data.index == committee_index
+        and attestation.data.slot + MIN_ATTESTATION_INCLUSION_DELAY == state.slot
+    ):
+        return False
+
+    if shard_transition == ShardTransition():
+        # No shard state transition for this shard
+        # TODO TBD: `state.shard_states[shard].transition_digest` or `Root()`?
+        assert attestation.data.head_shard_root == state.shard_states[shard].transition_digest
+        assert attestation.data.shard_transition_root == Root()
+        return False
+
+    return True
+```
+
 #### `is_winning_attestation`
 
 ```python
@@ -568,7 +592,7 @@ def is_winning_attestation(state: BeaconState,
     ``winning_root`` formed by ``committee_index`` committee at the current slot.
     """
     return (
-        attestation.slot == state.slot
+        attestation.data.slot == state.slot
         and attestation.data.index == committee_index
         and attestation.data.shard_transition_root == winning_root
     )
@@ -623,9 +647,9 @@ def process_block(state: BeaconState, block: BeaconBlock) -> None:
     process_block_header(state, block)
     process_randao(state, block.body)
     process_eth1_data(state, block.body)
-    verify_shard_transition_false_positives(state, block.body)
     process_light_client_signatures(state, block.body)
     process_operations(state, block.body)
+    verify_shard_transition_false_positives(state, block.body)
 ```
 
 #### Operations
@@ -821,11 +845,12 @@ def process_crosslinks(state: BeaconState,
     for committee_index in map(CommitteeIndex, range(committee_count)):
         shard = compute_shard_from_committee_index(state, committee_index, state.slot)
         # All attestations in the block for this committee/shard and current slot
+        shard_transition = shard_transitions[shard]
         shard_attestations = [
             attestation for attestation in attestations
-            if attestation.data.index == committee_index and attestation.data.slot == state.slot
+            if is_shard_attestation(state, attestation, shard_transition, shard, committee_index)
         ]
-        shard_transition = shard_transitions[shard]
+
         winning_root = process_crosslink_for_shard(state, committee_index, shard_transition, shard_attestations)
         if winning_root != Root():
             # Mark relevant pending attestations as creating a successful crosslink
@@ -923,7 +948,11 @@ def process_light_client_signatures(state: BeaconState, block_body: BeaconBlockB
     slot = compute_previous_slot(state.slot)
     signing_root = compute_signing_root(get_block_root_at_slot(state, slot),
                                         get_domain(state, DOMAIN_LIGHT_CLIENT, compute_epoch_at_slot(slot)))
-    assert bls.FastAggregateVerify(signer_pubkeys, signing_root, signature=block_body.light_client_signature)
+    if len(signer_pubkeys) == 0:
+        # TODO: Or disallow empty light_client_signature?
+        return
+    else:
+        assert bls.FastAggregateVerify(signer_pubkeys, signing_root, signature=block_body.light_client_signature)
 ```
 
 ### Epoch transition

@@ -358,7 +358,7 @@ def test_on_block_outside_safe_slots_but_finality(spec, state):
 
     # epoch 8, attest the first 5 blocks
     state, store, _ = yield from apply_next_slots_with_attestations(
-        spec, state, store, 5, True, True, test_steps=test_steps)
+        spec, state, store, 5, True, True, test_steps)
     assert state.finalized_checkpoint.epoch == store.finalized_checkpoint.epoch == 2
     assert state.current_justified_checkpoint.epoch == store.justified_checkpoint.epoch == 7
 
@@ -375,7 +375,7 @@ def test_on_block_outside_safe_slots_but_finality(spec, state):
     next_epoch(spec, state)
     next_slots(spec, state, 4)
     block = build_empty_block_for_next_slot(spec, state)
-    signed_block = state_transition_with_full_attestations_block(spec, state, block)
+    signed_block = state_transition_and_sign_block(spec, state, block)
     assert state.finalized_checkpoint.epoch == 7
     assert state.current_justified_checkpoint.epoch == 8
     # Step time past safe slots and run on_block
@@ -527,7 +527,7 @@ def test_new_justified_is_later_than_store_justified(spec, state):
     #     if store.time < spec.compute_time_at_slot(fork_2_state, block.message.slot):
     #         spec.on_tick(store, store.genesis_time + block.message.slot * spec.config.SECONDS_PER_SLOT)
     #     # valid_attestations=False because the attestations are outdated (older than previous epoch)
-    #     yield from add_block(spec, store, block, test_steps=test_steps, allow_invalid_attestations=False)
+    #     yield from add_block(spec, store, block, test_steps, allow_invalid_attestations=False)
 
     # assert store.finalized_checkpoint.hash_tree_root() == fork_3_state.finalized_checkpoint.hash_tree_root()
     # assert (store.justified_checkpoint.hash_tree_root()
@@ -606,7 +606,7 @@ def test_new_finalized_slot_is_not_justified_checkpoint_ancestor(spec, state):
     # # Apply blocks of `another_state` to `store`
     # for block in all_blocks:
     #     # NOTE: Do not call `on_tick` here
-    #     yield from add_block(spec, store, block, test_steps=test_steps, allow_invalid_attestations=True)
+    #     yield from add_block(spec, store, block, test_steps, allow_invalid_attestations=True)
 
     # finalized_slot = spec.compute_start_slot_at_epoch(store.finalized_checkpoint.epoch)
     # ancestor_at_finalized_slot = spec.get_ancestor(store, pre_store_justified_checkpoint_root, finalized_slot)
@@ -676,7 +676,8 @@ def test_new_finalized_slot_is_justified_checkpoint_ancestor(spec, state):
 
     pre_store_justified_checkpoint_root = store.justified_checkpoint.root
     for block in all_blocks:
-        # FIXME: remove allow_invalid_attestations
+        # FIXME: Once `on_block` and `on_attestation` logic is fixed,
+        # fix test case and remove allow_invalid_attestations flag
         yield from tick_and_add_block(spec, store, block, test_steps, allow_invalid_attestations=True)
 
     finalized_slot = spec.compute_start_slot_at_epoch(store.finalized_checkpoint.epoch)

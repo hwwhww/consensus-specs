@@ -22,10 +22,7 @@ def add_block_to_store(spec, store, signed_block):
     spec.on_block(store, signed_block)
 
 
-def tick_and_add_block(spec, store, signed_block, test_steps=None, valid=True, allow_invalid_attestations=False):
-    if test_steps is None:
-        test_steps = []
-
+def tick_and_add_block(spec, store, signed_block, test_steps, valid=True, allow_invalid_attestations=False):
     pre_state = store.block_states[signed_block.message.parent_root]
     block_time = pre_state.genesis_time + signed_block.message.slot * spec.config.SECONDS_PER_SLOT
 
@@ -38,10 +35,7 @@ def tick_and_add_block(spec, store, signed_block, test_steps=None, valid=True, a
     return post_state
 
 
-def tick_and_run_on_attestation(spec, store, attestation, test_steps=None):
-    if test_steps is None:
-        test_steps = []
-
+def tick_and_run_on_attestation(spec, store, attestation, test_steps):
     parent_block = store.blocks[attestation.data.beacon_block_root]
     pre_state = store.block_states[spec.hash_tree_root(parent_block)]
     block_time = pre_state.genesis_time + parent_block.slot * spec.config.SECONDS_PER_SLOT
@@ -56,10 +50,7 @@ def tick_and_run_on_attestation(spec, store, attestation, test_steps=None):
     test_steps.append({'attestation': get_attestation_file_name(attestation)})
 
 
-def add_attestation(spec, store, attestation, valid=True, test_steps=None):
-    if test_steps is None:
-        test_steps = []
-
+def add_attestation(spec, store, attestation, test_steps, valid=True):
     yield get_attestation_file_name(attestation), attestation
 
     if not valid:
@@ -127,13 +118,10 @@ def run_on_block(spec, store, signed_block, valid=True):
     assert store.blocks[signed_block.message.hash_tree_root()] == signed_block.message
 
 
-def add_block(spec, store, signed_block, test_steps=None, valid=True, allow_invalid_attestations=False):
+def add_block(spec, store, signed_block, test_steps, valid=True, allow_invalid_attestations=False):
     """
     Run on_block and on_attestation
     """
-    if test_steps is None:
-        test_steps = []
-
     yield get_block_file_name(signed_block), signed_block
 
     if not valid:
@@ -216,11 +204,8 @@ def apply_next_slots_with_attestations(spec,
                                        slots,
                                        fill_cur_epoch,
                                        fill_prev_epoch,
-                                       participation_fn=None,
-                                       test_steps=None):
-    if test_steps is None:
-        test_steps = []
-
+                                       test_steps,
+                                       participation_fn=None):
     _, new_signed_blocks, post_state = next_slots_with_attestations(
         spec, state, slots, fill_cur_epoch, fill_prev_epoch, participation_fn=participation_fn)
     for signed_block in new_signed_blocks:

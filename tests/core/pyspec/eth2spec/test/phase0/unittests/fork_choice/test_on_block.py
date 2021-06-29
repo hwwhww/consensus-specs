@@ -7,6 +7,7 @@ from eth2spec.test.helpers.attestations import (
     next_epoch_with_attestations,
     next_slots_with_attestations,
     state_transition_with_full_block,
+    state_transition_with_signed_full_block,
 )
 from eth2spec.test.helpers.block import (
     build_empty_block_for_next_slot,
@@ -301,14 +302,14 @@ def test_new_justified_is_later_than_store_justified(spec, state):
     for _ in range(2):
         next_epoch(spec, fork_2_state)
         next_slots(spec, fork_2_state, 4)
-        signed_block = state_transition_with_full_block(spec, fork_2_state, True, True)
+        signed_block = state_transition_with_signed_full_block(spec, fork_2_state, True, True)
         all_blocks.append(signed_block.copy())
         assert fork_2_state.current_justified_checkpoint.epoch == 0
 
     # Propose a block at epoch 6, SAFE_SLOTS_TO_UPDATE_JUSTIFIED + 2 slot
     next_epoch(spec, fork_2_state)
     next_slots(spec, fork_2_state, spec.SAFE_SLOTS_TO_UPDATE_JUSTIFIED + 2)
-    signed_block = state_transition_with_full_block(spec, fork_2_state, True, True)
+    signed_block = state_transition_with_signed_full_block(spec, fork_2_state, True, True)
     all_blocks.append(signed_block.copy())
     assert fork_2_state.finalized_checkpoint.epoch == 0
     assert fork_2_state.current_justified_checkpoint.epoch == 5

@@ -1,5 +1,8 @@
 from eth_utils import encode_hex
-from eth2spec.test.helpers.attestations import next_epoch_with_attestations
+from eth2spec.test.helpers.attestations import (
+    next_epoch_with_attestations,
+    next_slots_with_attestations,
+)
 
 
 def get_anchor_root(spec, state):
@@ -19,7 +22,7 @@ def add_block_to_store(spec, store, signed_block):
     spec.on_block(store, signed_block)
 
 
-def tick_and_add_block(spec, store, signed_block, test_steps=None, valid=True):
+def tick_and_add_block(spec, store, signed_block, test_steps=None, valid=True, allow_invalid_attestations=False):
     if test_steps is None:
         test_steps = []
 
@@ -29,7 +32,10 @@ def tick_and_add_block(spec, store, signed_block, test_steps=None, valid=True):
     if store.time < block_time:
         on_tick_and_append_step(spec, store, block_time, test_steps)
 
-    yield from add_block(spec, store, signed_block, test_steps, valid=valid)
+    post_state = yield from add_block(
+        spec, store, signed_block, test_steps, valid=valid, allow_invalid_attestations=allow_invalid_attestations)
+
+    return post_state
 
 
 def tick_and_run_on_attestation(spec, store, attestation, test_steps=None):
@@ -48,6 +54,40 @@ def tick_and_run_on_attestation(spec, store, attestation, test_steps=None):
     spec.on_attestation(store, attestation)
     yield get_attestation_file_name(attestation), attestation
     test_steps.append({'attestation': get_attestation_file_name(attestation)})
+
+
+def add_attestation(spec, store, attestation, valid=True, test_steps=None):
+    if test_steps is None:
+        test_steps = []
+
+    yield get_attestation_file_name(attestation), attestation
+
+    if not valid:
+        try:
+            run_on_attestation(spec, store, attestation, valid=True)
+        except AssertionError:
+            test_steps.append({
+                'attestation': get_attestation_file_name(attestation),
+                'valid': False,
+            })
+            return
+        else:
+            assert False
+
+    run_on_attestation(spec, store, attestation, valid=True)
+    test_steps.append({'attestation': get_attestation_file_name(attestation)})
+
+
+def run_on_attestation(spec, store, attestation, valid=True):
+    if not valid:
+        try:
+            spec.on_attestation(store, attestation)
+        except AssertionError:
+            return
+        else:
+            assert False
+
+    spec.on_attestation(store, attestation)
 
 
 def get_genesis_forkchoice_store(spec, genesis_state):
@@ -87,7 +127,7 @@ def run_on_block(spec, store, signed_block, valid=True):
     assert store.blocks[signed_block.message.hash_tree_root()] == signed_block.message
 
 
-def add_block(spec, store, signed_block, test_steps=None, valid=True):
+def add_block(spec, store, signed_block, test_steps=None, valid=True, allow_invalid_attestations=False):
     """
     Run on_block and on_attestation
     """
@@ -112,8 +152,14 @@ def add_block(spec, store, signed_block, test_steps=None, valid=True):
     test_steps.append({'block': get_block_file_name(signed_block)})
 
     # An on_block step implies receiving block's attestations
-    for attestation in signed_block.message.body.attestations:
-        spec.on_attestation(store, attestation)
+    try:
+        for attestation in signed_block.message.body.attestations:
+            run_on_attestation(spec, store, attestation, valid=True)
+    except AssertionError:
+        if allow_invalid_attestations:
+            pass
+        else:
+            raise
 
     block_root = signed_block.message.hash_tree_root()
     assert store.blocks[block_root] == signed_block.message
@@ -127,6 +173,8 @@ def add_block(spec, store, signed_block, test_steps=None, valid=True):
             'best_justified_checkpoint': encode_hex(store.best_justified_checkpoint.root),
         }
     })
+
+    return store.block_states[signed_block.message.hash_tree_root()]
 
 
 def get_formatted_head_output(spec, store):
@@ -148,7 +196,33 @@ def apply_next_epoch_with_attestations(spec,
     if test_steps is None:
         test_steps = []
 
-    _, new_signed_blocks, post_state = next_epoch_with_attestations(spec, state, fill_cur_epoch, fill_prev_epoch)
+    _, new_signed_blocks, post_state = next_epoch_with_attestations(
+        spec, state, fill_cur_epoch, fill_prev_epoch, participation_fn=participation_fn)
+    for signed_block in new_signed_blocks:
+        block = signed_block.message
+        yield from tick_and_add_block(spec, store, signed_block, test_steps)
+        block_root = block.hash_tree_root()
+        assert store.blocks[block_root] == block
+        last_signed_block = signed_block
+
+    assert store.block_states[block_root].hash_tree_root() == post_state.hash_tree_root()
+
+    return post_state, store, last_signed_block
+
+
+def apply_next_slots_with_attestations(spec,
+                                       state,
+                                       store,
+                                       slots,
+                                       fill_cur_epoch,
+                                       fill_prev_epoch,
+                                       participation_fn=None,
+                                       test_steps=None):
+    if test_steps is None:
+        test_steps = []
+
+    _, new_signed_blocks, post_state = next_slots_with_attestations(
+        spec, state, slots, fill_cur_epoch, fill_prev_epoch, participation_fn=participation_fn)
     for signed_block in new_signed_blocks:
         block = signed_block.message
         yield from tick_and_add_block(spec, store, signed_block, test_steps)

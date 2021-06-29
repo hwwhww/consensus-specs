@@ -247,6 +247,9 @@ def next_epoch_with_attestations(spec,
 
 
 def state_transition_with_full_block(spec, state, fill_cur_epoch, fill_prev_epoch, participation_fn=None):
+    """
+    Build and apply a block with attestions at the calculated `slot_to_attest` of current epoch and/or previous epoch.
+    """
     block = build_empty_block_for_next_slot(spec, state)
     if fill_cur_epoch and state.slot >= spec.MIN_ATTESTATION_INCLUSION_DELAY:
         slot_to_attest = state.slot - spec.MIN_ATTESTATION_INCLUSION_DELAY + 1
@@ -270,6 +273,41 @@ def state_transition_with_full_block(spec, state, fill_cur_epoch, fill_prev_epoc
         for attestation in attestations:
             block.body.attestations.append(attestation)
 
+    signed_block = state_transition_and_sign_block(spec, state, block)
+    return signed_block
+
+
+def state_transition_with_full_attestations_block(spec, state, fill_cur_epoch, fill_prev_epoch):
+    """
+    Build and apply a block with attestions at all valid slots of current epoch and/or previous epoch.
+    """
+    # Build a block with previous attestations
+    block = build_empty_block_for_next_slot(spec, state)
+    attestations = []
+
+    if fill_cur_epoch:
+        # current epoch
+        slots = state.slot % spec.SLOTS_PER_EPOCH
+        for slot_offset in range(slots):
+            target_slot = state.slot - slot_offset
+            attestations += _get_valid_attestation_at_slot(
+                state,
+                spec,
+                target_slot,
+            )
+
+    if fill_prev_epoch:
+        # attest previous epoch
+        slots = spec.SLOTS_PER_EPOCH - state.slot % spec.SLOTS_PER_EPOCH
+        for slot_offset in range(1, slots):
+            target_slot = state.slot - (state.slot % spec.SLOTS_PER_EPOCH) - slot_offset
+            attestations += _get_valid_attestation_at_slot(
+                state,
+                spec,
+                target_slot,
+            )
+
+    block.body.attestations = attestations
     signed_block = state_transition_and_sign_block(spec, state, block)
     return signed_block
 

@@ -61,7 +61,16 @@
 
 ### Helper functions
 
+#### `LineType`
+
+```python
+class LineType(enum.Enum):
+    ROW = 0
+    COLUMN = 1
+```
+
 #### `cycle`
+
 ```python
 def cycle(seq: Sequence[Any], start: int) -> Any:
     while True:
@@ -80,14 +89,11 @@ def get_custody_lines(node_id: int, epoch: int, custody_size: int, line_type: Li
     return [next(iterator) for _ in range(custody_size)]
 ```
 
-#### Honest peer guide
-
 ## Custody
 
+### 1. Custody
 
-#### 1. Custody
-
-##### `CUSTODY_REQUIREMENT`
+#### `CUSTODY_REQUIREMENT`
 
 Each node downloads and custodies a minimum of `CUSTODY_REQUIREMENT` rows and `CUSTODY_REQUIREMENT` columns per slot. The particular rows and columns that the node is required to custody are selected pseudo-randomly (more on this below).
 
@@ -95,7 +101,7 @@ A node *may* choose to custody and serve more than the minimum honesty requireme
 
 A node stores the custodied rows/columns for the duration of the pruning period and responds to peer requests for samples on those rows/columns.
 
-##### Public, deterministic selection 
+#### Public, deterministic selection 
 
 The particular rows and columns that a node custodies are selected pseudo-randomly as a function of the node-id, epoch, and custody size (sample function interface: `get_custody_lines(config: Config, node_id: int, epoch: int, custody_size: int, line_type: LineType) -> list[int]` and column variant) -- importantly this function can be run by any party as the inputs are all public.
 
@@ -105,7 +111,7 @@ The particular rows and columns that a node custodies are selected pseudo-random
 
 *Note*: Even though this function accepts `epoch` as an input, the function can be tuned to remain stable for many epochs depending on network/subnet stability requirements. There is a trade-off between rigidity of the network and the depth to which a subnet can be utilized for recovery. To ensure subnets can be utilized for recovery, staggered rotation needs to happen likely on the order of the prune period.
 
-#### 2. Peer discovery
+### 2. Peer discovery
 
 At each slot, a node needs to be able to readily sample from *any* set of rows and columns. To this end, a node should find and maintain a set of diverse and reliable peers that can regularly satisfy their sampling demands.
 
@@ -117,9 +123,9 @@ A node runs a background peer discovery process, maintaining at least `NUMBER_OF
 
 *Note*: A DHT-based peer discovery mechanism is expected to be utilized in the above. The beacon-chain network currently utilizes discv5 in a similar method as described for finding peers of particular distributions of attestation subnets. Additional peer discovery methods are valuable to integrate (e.g. latent peer discovery via libp2p gossipsub) to add a defense in breadth against one of the discovery methods being attacked.
 
-#### 3. Row/Column gossip
+### 3. Row/Column gossip
 
-##### Parameters
+#### Parameters
 
 There are both `NUMBER_OF_ROWS` row and `NUMBER_OF_COLUMNS` column gossip topics.
 
@@ -129,7 +135,7 @@ There are both `NUMBER_OF_ROWS` row and `NUMBER_OF_COLUMNS` column gossip topics
 To custody a particular row or column, a node joins the respective gossip subnet. Verifiable samples from their respective row/column are gossiped on the assigned subnet.
 
 
-##### Reconstruction and cross-seeding
+#### Reconstruction and cross-seeding
 
 In the event a node does *not* receive all samples for a given row/column but does receive enough to reconstruct (e.g. 50%+, a function of coding rate), the node should reconstruct locally and send the reconstructed samples on the subnet.
 
@@ -141,7 +147,7 @@ Additionally, the node should send (cross-seed) any samples missing from a given
 
 *Note*: There may be anti-DoS and quality-of-service considerations around how to send samples and consider samples -- is each individual sample a message or are they sent in aggregate forms.
 
-#### 4. Peer sampling
+### 4. Peer sampling
 
 At each slot, a node makes (locally randomly determined) `SAMPLES_PER_SLOT` queries for samples from their peers. A node utilizes `get_custody_lines(..., line_type=LineType.ROW)`/`get_custody_lines(..., line_type=LineType.COLUMN)` to determine which peer(s) to request from. If a node has enough good/honest peers across all rows and columns, this has a high chance of success.
 
@@ -149,13 +155,13 @@ Upon sampling, the node sends an `DO_YOU_HAVE` packet for all samples to all pee
 
 Upon receiving a sample, a node will pass on the sample to any node which did not previously have this sample, known by `DO_YOU_HAVE` response (but was supposed to have it according to its `get_custody_lines` results).
 
-#### 5. Peer scoring
+### 5. Peer scoring
 
 Due to the deterministic custody functions, a node knows exactly what a peer should be able to respond to. In the event that a peer does not respond to samples of their custodied rows/columns, a node may downscore or disconnect from a peer.
 
 *Note*: a peer might not respond to requests either because they are dishonest (don't actually custody the data), because of bandwidth saturation (local throttling), or because they were, themselves, not able to get all the samples. In the first two cases, the peer is not of consistent DAS value and a node can/should seek to optimize for better peers. In the latter, the node can make local determinations based on repeated `DO_YOU_HAVE` queries to that peer and other peers to assess the value/honesty of the peer.
 
-#### 6. DAS providers
+### 6. DAS providers
 
 A DAS provider is a consistently-available-for-DAS-queries, super-full (or high capacity) node. To the p2p, these look just like other nodes but with high advertised capacity, and they should generally be able to be latently found via normal discovery.
 
@@ -163,7 +169,7 @@ They can also be found out-of-band and configured into a node to connect to dire
 
 Such direct peering utilizes a feature supported out of the box today on all nodes and can complement (and reduce attackability) of alternative peer discovery mechanisms.
 
-#### 7. A note on fork choice
+### 7. A note on fork choice
 
 The fork choice rule (essentially a DA filter) is *orthogonal to a given DAS design*, other than the efficiency of particular design impacting it.
 

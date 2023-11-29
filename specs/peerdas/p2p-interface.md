@@ -18,7 +18,7 @@
         - [`data_line_{line_type}_{line_index}`](#data_line_line_type_line_index)
   - [The Req/Resp domain](#the-reqresp-domain)
     - [Messages](#messages)
-      - [DoYouHave v1](#doyouhave-v1)
+      - [GetCustodyStatus v1](#getcustodystatus-v1)
       - [DASQuery v1](#dasquery-v1)
       - [DataLineQuery v1](#datalinequery-v1)
 
@@ -65,9 +65,9 @@ The *type* of the payload of this topic is `SlotDataLine`.
 
 #### Messages
 
-##### DoYouHave v1
+##### GetCustodyStatus v1
 
-**Protocol ID:** `/eth2/beacon_chain/req/do_you_have/1/`
+**Protocol ID:** `/eth2/beacon_chain/req/get_custody_status/1/`
 
 The `<context-bytes>` field is calculated as `context = compute_fork_digest(fork_version, genesis_validators_root)`:
 
@@ -84,6 +84,8 @@ Response Content:
   Bitvector[NUMBER_OF_ROWS * NUMBER_OF_COLUMNS]
 )
 ```
+
+The response bitfield indicates the samples of the given slot that the peer has and can provide.
 
 ##### DASQuery v1
 

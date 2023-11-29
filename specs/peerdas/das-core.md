@@ -126,9 +126,9 @@ Additionally, the node should send (cross-seed) any samples missing from a given
 
 At each slot, a node makes (locally randomly determined) `SAMPLES_PER_SLOT` queries for samples from their peers. A node utilizes `get_custody_lines(..., line_type=LineType.ROW)`/`get_custody_lines(..., line_type=LineType.COLUMN)` to determine which peer(s) to request from. If a node has enough good/honest peers across all rows and columns, this has a high chance of success.
 
-Upon sampling, the node sends a `DoYouHave` packet for all samples to all peers that are determined to custody this sample according to their `get_custody_lines` results. All peers answer first with a bitfield of the samples that they have.
+Upon sampling, the node sends a `GetCustodyStatus` request for all samples to all peers that are determined to custody this sample according to their `get_custody_lines` results. All peers answer first with a bitfield of the samples that they have.
 
-Upon receiving a sample, a node will pass on the sample to any node that did not previously have this sample, known by the `DoYouHave` response (but was supposed to have it according to its `get_custody_lines` results).
+Upon receiving a sample, a node will pass on the sample to any node that did not previously have this sample, known by the `CustodyStatus` response (but was supposed to have it according to its `get_custody_lines` results).
 
 ## Peer scoring
 

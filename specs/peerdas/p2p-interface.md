@@ -53,21 +53,19 @@ class SlotDataLine(Container):
 
 ```python
 class CustodyStatus(Container):
-    row: Bitvector[NUMBER_OF_ROWS]
-    column: Bitvector[NUMBER_OF_COLUMNS]
+    custody_bits: Bitvector[NUMBER_OF_ROWS * NUMBER_OF_COLUMNS]
 ```
 
 #### `DASSample`
 
 ```python
 class DASSample(Container):
-    slot: Slot
     chunk: ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 4 // (NUMBER_OF_ROWS * NUMBER_OF_COLUMNS)]
 ```
 
 ### The gossip domain: gossipsub
 
-Some gossip meshes are upgraded in the fork of Deneb to support upgraded types.
+Some gossip meshes are upgraded in the fork of Pe to support upgraded types.
 
 #### Topics and messages
 
@@ -105,7 +103,7 @@ Request Content:
 Response Content:
 ```
 (
-  CustodyStatus
+  custody_status: CustodyStatus
 )
 ```
 
@@ -114,6 +112,12 @@ Response Content:
 **Protocol ID:** `/eth2/beacon_chain/req/das_query/1/`
 
 The `<context-bytes>` field is calculated as `context = compute_fork_digest(fork_version, genesis_validators_root)`:
+
+[1]: # (eth2spec: skip)
+
+| `fork_version`           | Chunk SSZ type                |
+|--------------------------|-------------------------------|
+| `PEERDAS_FORK_VERSION`   | `peerdas.DASSample`           |
 
 Request Content:
 ```
@@ -128,7 +132,7 @@ Request Content:
 Response Content:
 ```
 (
-  das_sample: ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 4 // (NUMBER_OF_ROWS * NUMBER_OF_COLUMNS)]
+  das_sample: DASSample
 )
 ```
 

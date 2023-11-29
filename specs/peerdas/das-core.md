@@ -44,6 +44,7 @@
 | - | - | - |
 | `SAMPLES_PER_SLOT` | `70` | Number of random samples a node queries per slot |
 | `CUSTODY_REQUIREMENT` | `2` | Minimum number of both rows and columns an honest node custodies and serves samples from |
+| `TARGET_NUMBER_OF_PEERS` | `70` | Suggested minimum peer count |
 
 ### Helper functions
 
@@ -90,9 +91,9 @@ The particular rows and columns that a node custodies are selected pseudo-random
 
 At each slot, a node needs to be able to readily sample from *any* set of rows and columns. To this end, a node should find and maintain a set of diverse and reliable peers that can regularly satisfy their sampling demands.
 
-A node runs a background peer discovery process, maintaining at least `NUMBER_OF_PEERS` of various custody distributions (both custody_size and row/column assignments). The combination of advertised `custody_size` size and public node-id make this readily and publicly accessible.
+A node runs a background peer discovery process, maintaining at least `TARGET_NUMBER_OF_PEERS` of various custody distributions (both custody_size and row/column assignments). The combination of advertised `custody_size` size and public node-id make this readily and publicly accessible.
 
-`NUMBER_OF_PEERS` should be tuned upward in the event of failed sampling.
+`TARGET_NUMBER_OF_PEERS` should be tuned upward in the event of failed sampling.
 
 *Note*: while high-capacity and super-full nodes are high value with respect to satisfying sampling requirements, a node should maintain a distribution across node capacities as to not centralize the p2p graph too much (in the extreme becomes hub/spoke) and to distribute sampling load better across all nodes.
 
@@ -125,9 +126,9 @@ Additionally, the node should send (cross-seed) any samples missing from a given
 
 At each slot, a node makes (locally randomly determined) `SAMPLES_PER_SLOT` queries for samples from their peers. A node utilizes `get_custody_lines(..., line_type=LineType.ROW)`/`get_custody_lines(..., line_type=LineType.COLUMN)` to determine which peer(s) to request from. If a node has enough good/honest peers across all rows and columns, this has a high chance of success.
 
-Upon sampling, the node sends a `DO_YOU_HAVE` packet for all samples to all peers that are determined to custody this sample according to their `get_custody_lines` results. All peers answer first with a bitfield of the samples that they have.
+Upon sampling, the node sends a `DoYouHave` packet for all samples to all peers that are determined to custody this sample according to their `get_custody_lines` results. All peers answer first with a bitfield of the samples that they have.
 
-Upon receiving a sample, a node will pass on the sample to any node that did not previously have this sample, known by the `DO_YOU_HAVE` response (but was supposed to have it according to its `get_custody_lines` results).
+Upon receiving a sample, a node will pass on the sample to any node that did not previously have this sample, known by the `DoYouHave` response (but was supposed to have it according to its `get_custody_lines` results).
 
 ## Peer scoring
 

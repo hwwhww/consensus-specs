@@ -9,13 +9,18 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Modifications in PeerDAS](#modifications-in-peerdas)
-- [Custom types](#custom-types)
-- [Containers](#containers)
+  - [Custom types](#custom-types)
+  - [Preset](#preset)
+  - [Containers](#containers)
     - [`DataLine`](#dataline)
+    - [`DataLineSidecar`](#datalinesidecar)
+  - [Helpers](#helpers)
+      - [`verify_data_line_sidecar_inclusion_proof`](#verify_data_line_sidecar_inclusion_proof)
   - [The gossip domain: gossipsub](#the-gossip-domain-gossipsub)
     - [Topics and messages](#topics-and-messages)
       - [Samples subnets](#samples-subnets)
-        - [`data_line_{line_type}_{line_index}`](#data_line_line_type_line_index)
+        - [`data_line_row_{line_index}`](#data_line_row_line_index)
+        - [`data_line_column_{line_index}`](#data_line_column_line_index)
   - [The Req/Resp domain](#the-reqresp-domain)
     - [Messages](#messages)
       - [GetCustodyStatus v1](#getcustodystatus-v1)
@@ -27,17 +32,22 @@
 
 ## Modifications in PeerDAS
 
-## Custom types
+### Custom types
 
 We define the following Python custom types for type hinting and readability:
 
 | Name | SSZ equivalent | Description |
 | - | - | - |
-| `DataLine`   | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 4]` | The data of each row or column in PeerDAS |
+| `DataLine`   | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB]` | The data of each row or column in PeerDAS |
 
-**TODO**: Change PeerDAS `MAX_BLOBS_PER_BLOCK` to full-danksharding size.
+### Preset
 
-## Containers
+| Name                                     | Value                             | Description                                                         |
+|------------------------------------------|-----------------------------------|---------------------------------------------------------------------|
+| `KZG_COMMITMENTS_INCLUSION_PROOF_INDEX`   | `uint64(get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'))` (= 27) | <!-- predefined --> Merkle proof index for `blob_kzg_commitments` |
+
+
+### Containers
 
 #### `DataLine`
 
@@ -45,6 +55,35 @@ We define the following Python custom types for type hinting and readability:
 class SlotDataLine(Container):
     slot: Slot
     data: DataLine
+```
+
+#### `DataLineSidecar`
+
+```python
+class DataLineSidecar(Container):
+    start: BlobIndex
+    blobs: List[Blob, MAX_BLOBS_PER_BLOCK]
+    kzg_commitments: List[KZGCommitment, MAX_BLOBS_PER_BLOCK]  # All KZGCommitment in BeaconBlock
+    signed_block_header: SignedBeaconBlockHeader
+    kzg_commitments_inclusion_proof: Vector[Bytes32, floorlog2(KZG_COMMITMENTS_INCLUSION_PROOF_INDEX)]
+```
+
+### Helpers
+
+##### `verify_data_line_sidecar_inclusion_proof`
+
+```python
+def verify_data_line_sidecar_inclusion_proof(data_line_sidecar: DataLineSidecar) -> bool:
+    for i, blob in enumerate(data_line_sidecar.blobs):
+        assert blob_to_kzg_commitment(blob) == data_line_sidecar.kzg_commitments[start + i]
+ 
+    return is_valid_merkle_branch(
+        leaf=hash_tree_root(data_line_sidecar.kzg_commitments),
+        branch=data_line_sidecar.kzg_commitments_inclusion_proof,
+        depth=floorlog2(KZG_COMMITMENTS_INCLUSION_PROOF_INDEX),
+        index=KZG_COMMITMENTS_INCLUSION_PROOF_INDEX,
+        root=data_line_sidecar.signed_block_header.message.body_root,
+    )
 ```
 
 ### The gossip domain: gossipsub
@@ -55,11 +94,21 @@ Some gossip meshes are upgraded in the fork of Pe to support upgraded types.
 
 ##### Samples subnets
 
-###### `data_line_{line_type}_{line_index}`
+###### `data_line_row_{line_index}`
 
-This topic is used to propagate the data line. `line_type` may be `0` for row or `1` for column; `line_index` maps the index of the given row or column.
+This topic is used to propagate the row data line and s
+
+The *type* of the payload of this topic is `DataLineSidecar`. It contains extra fields for verifying if the blob(s) of the row is included in the given `BeaconBlockHeader` with Merkle-proof.
+
+TODO: add verification rules
+
+###### `data_line_column_{line_index}`
+
+This topic is used to propagate the column data line, where `line_index` maps the index of the given column.
 
 The *type* of the payload of this topic is `SlotDataLine`.
+
+TODO: add verification rules
 
 ### The Req/Resp domain
 
@@ -106,7 +155,7 @@ Request Content:
 Response Content:
 ```
 (
-  ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 4 // (NUMBER_OF_ROWS * NUMBER_OF_COLUMNS)]
+  ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2 // (NUMBER_OF_ROWS * NUMBER_OF_COLUMNS)]
 )
 ```
 

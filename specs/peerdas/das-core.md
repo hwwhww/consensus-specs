@@ -15,7 +15,7 @@
     - [`LineType`](#linetype)
     - [`get_custody_lines`](#get_custody_lines)
 - [Custody](#custody)
-  - [`CUSTODY_REQUIREMENT`](#custody_requirement)
+  - [Custody requirement](#custody-requirement)
   - [Public, deterministic selection](#public-deterministic-selection)
 - [Peer discovery](#peer-discovery)
 - [Row/Column gossip](#rowcolumn-gossip)
@@ -35,7 +35,7 @@
 
 | Name | Value | Description |
 | - | - | - |
-| `NUMBER_OF_ROWS` | `uint64(2**4)` (= 32) | Number of rows in the 2D data array |
+| `NUMBER_OF_ROWS` | `uint64(2**4)` (= 6) | Number of rows in the 2D data array. It's now set to `MAX_BLOBS_PER_BLOCK` value. |
 | `NUMBER_OF_COLUMNS` | `uint64(2**4)` (= 32) | Number of columns in the 2D data array |
 
 ### Custody setting
@@ -71,7 +71,7 @@ def get_custody_lines(node_id: int, epoch: int, custody_size: int, line_type: Li
 
 ## Custody
 
-### `CUSTODY_REQUIREMENT`
+### Custody requirement
 
 Each node downloads and custodies a minimum of `CUSTODY_REQUIREMENT` rows and `CUSTODY_REQUIREMENT` columns per slot. The particular rows and columns that the node is required to custody are selected pseudo-randomly (more on this below).
 

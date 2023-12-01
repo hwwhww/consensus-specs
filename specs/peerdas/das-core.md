@@ -150,6 +150,6 @@ The fork choice rule (essentially a DA filter) is *orthogonal to a given DAS des
 
 In any DAS design, there are probably a few degrees of freedom around timing, acceptability of short-term re-orgs, etc. 
 
-For example, the fork choice rule might require validators to do successful DAS on slot N to be able to include block of slot `N` in it's fork choice. That's the tightest DA filter. But trailing filters are also probably acceptable, knowing that there might be some failures/short re-orgs but that they don't hurt the aggregate security. For example, the rule could be — DAS must be completed for slot N-1 for a child block in N to be included in the fork choice.
+For example, the fork choice rule might require validators to do successful DAS on slot N to be able to include block of slot `N` in its fork choice. That's the tightest DA filter. But trailing filters are also probably acceptable, knowing that there might be some failures/short re-orgs but that they don't hurt the aggregate security. For example, the rule could be — DAS must be completed for slot N-1 for a child block in N to be included in the fork choice.
 
 Such trailing techniques and their analysis will be valuable for any DAS construction. The question is — can you relax how quickly you need to do DA and in the worst case not confirm unavailable data via attestations/finality, and what impact does it have on short-term re-orgs and fast confirmation rules.

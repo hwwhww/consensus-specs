@@ -62,8 +62,8 @@ class SlotDataLine(Container):
 ```python
 class DataLineSidecar(Container):
     start: BlobIndex
-    blobs: List[Blob, MAX_BLOBS_PER_BLOCK]
-    kzg_commitments: List[KZGCommitment, MAX_BLOBS_PER_BLOCK]  # All KZGCommitment in BeaconBlock
+    blobs: List[Blob, MAX_BLOB_COMMITMENTS_PER_BLOCK]
+    kzg_commitments: List[KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK]  # All KZGCommitment in BeaconBlock
     signed_block_header: SignedBeaconBlockHeader
     kzg_commitments_inclusion_proof: Vector[Bytes32, floorlog2(KZG_COMMITMENTS_INCLUSION_PROOF_INDEX)]
 ```
@@ -96,7 +96,7 @@ Some gossip meshes are upgraded in the fork of Pe to support upgraded types.
 
 ###### `data_line_row_{line_index}`
 
-This topic is used to propagate the row data line and s
+This topic is used to propagate the row data line, where `line_index` maps to the index of the given column.
 
 The *type* of the payload of this topic is `DataLineSidecar`. It contains extra fields for verifying if the blob(s) of the row is included in the given `BeaconBlockHeader` with Merkle-proof.
 

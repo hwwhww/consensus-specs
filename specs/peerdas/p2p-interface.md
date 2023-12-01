@@ -23,7 +23,6 @@
         - [`data_column_{subnet_id}`](#data_column_subnet_id)
   - [The Req/Resp domain](#the-reqresp-domain)
     - [Messages](#messages)
-      - [GetCustodyStatus v1](#getcustodystatus-v1)
       - [DataRowByRootAndIndex v1](#datarowbyrootandindex-v1)
       - [DataColumnByRootAndIndex v1](#datacolumnbyrootandindex-v1)
 
@@ -135,28 +134,6 @@ TODO: add verification rules. Verify with `verify_column_sidecar`.
 ### The Req/Resp domain
 
 #### Messages
-
-##### GetCustodyStatus v1
-
-**Protocol ID:** `/eth2/beacon_chain/req/get_custody_status/1/`
-
-The `<context-bytes>` field is calculated as `context = compute_fork_digest(fork_version, genesis_validators_root)`:
-
-Request Content:
-```
-(
-  slot: Slot
-)
-```
-
-Response Content:
-```
-(
-  Bitvector[MAX_BLOBS_PER_BLOCK * NUMBER_OF_COLUMNS]
-)
-```
-
-The response bitfield indicates the samples of the given slot that the peer has and can provide.
 
 ##### DataRowByRootAndIndex v1
 

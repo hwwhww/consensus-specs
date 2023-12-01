@@ -12,20 +12,20 @@
   - [Custom types](#custom-types)
   - [Preset](#preset)
   - [Containers](#containers)
-    - [`DataLine`](#dataline)
-    - [`DataLineSidecar`](#datalinesidecar)
+    - [`DataColumnSidecar`](#datacolumnsidecar)
   - [Helpers](#helpers)
-      - [`verify_data_line_sidecar_inclusion_proof`](#verify_data_line_sidecar_inclusion_proof)
+      - [`get_row`](#get_row)
+      - [`get_column`](#get_column)
+      - [`verify_column_sidecar`](#verify_column_sidecar)
   - [The gossip domain: gossipsub](#the-gossip-domain-gossipsub)
     - [Topics and messages](#topics-and-messages)
       - [Samples subnets](#samples-subnets)
-        - [`data_line_row_{line_index}`](#data_line_row_line_index)
-        - [`data_line_column_{line_index}`](#data_line_column_line_index)
+        - [`data_column_{subnet_id}`](#data_column_subnet_id)
   - [The Req/Resp domain](#the-reqresp-domain)
     - [Messages](#messages)
       - [GetCustodyStatus v1](#getcustodystatus-v1)
-      - [DASQuery v1](#dasquery-v1)
-      - [DataLineQuery v1](#datalinequery-v1)
+      - [DataRowByRootAndIndex v1](#datarowbyrootandindex-v1)
+      - [DataColumnByRootAndIndex v1](#datacolumnbyrootandindex-v1)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <!-- /TOC -->
@@ -38,53 +38,83 @@ We define the following Python custom types for type hinting and readability:
 
 | Name | SSZ equivalent | Description |
 | - | - | - |
-| `DataLine`   | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB]` | The data of each row or column in PeerDAS |
+| `ExtendedData` | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2]` | The full data with blobs and 1-D erasure coding extension |
+| `DataRow`   | `ByteList[BYTES_PER_BLOB * 2]` | The data of each row in PeerDAS |
+| `DataColumn`   | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS]` | The data of each column in PeerDAS |
+| `LineIndex`   | `uint64` | The index of the rows or columns in `ExtendedData` matrix |
 
 ### Preset
 
 | Name                                     | Value                             | Description                                                         |
 |------------------------------------------|-----------------------------------|---------------------------------------------------------------------|
-| `KZG_COMMITMENTS_INCLUSION_PROOF_INDEX`   | `uint64(get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'))` (= 27) | <!-- predefined --> Merkle proof index for `blob_kzg_commitments` |
-
+| `KZG_COMMITMENTS_MERKLE_PROOF_INDEX`   | `uint64(get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'))` (= 27) | <!-- predefined --> Merkle proof index for `blob_kzg_commitments` |
 
 ### Containers
 
-#### `DataLine`
+#### `DataColumnSidecar`
 
 ```python
-class SlotDataLine(Container):
-    slot: Slot
-    data: DataLine
-```
-
-#### `DataLineSidecar`
-
-```python
-class DataLineSidecar(Container):
-    start: BlobIndex
-    blobs: List[Blob, MAX_BLOB_COMMITMENTS_PER_BLOCK]
-    kzg_commitments: List[KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK]  # All KZGCommitment in BeaconBlock
+class DataColumnSidecar(Container):
+    index: LineIndex  # Index of column in extended data
+    column: DataColumn
+    kzg_commitments: List[KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK]
+    kzg_proofs: List[KZGProof, MAX_BLOB_COMMITMENTS_PER_BLOCK]
     signed_block_header: SignedBeaconBlockHeader
-    kzg_commitments_inclusion_proof: Vector[Bytes32, floorlog2(KZG_COMMITMENTS_INCLUSION_PROOF_INDEX)]
+    kzg_commitment_merkle_proof: Vector[Bytes32, KZG_COMMITMENT_INCLUSION_PROOF_DEPTH]
 ```
+
 
 ### Helpers
 
-##### `verify_data_line_sidecar_inclusion_proof`
+##### `get_row`
 
 ```python
-def verify_data_line_sidecar_inclusion_proof(data_line_sidecar: DataLineSidecar) -> bool:
-    for i, blob in enumerate(data_line_sidecar.blobs):
-        assert blob_to_kzg_commitment(blob) == data_line_sidecar.kzg_commitments[start + i]
- 
+def get_row(data: ExtendedData, index: LineIndex) -> DataRow:
+    length = BYTES_PER_BLOB * 2
+    assert len(data) % (BYTES_PER_BLOB * 2) == 0
+    assert len(data) // (BYTES_PER_BLOB * 2) <= MAX_BLOBS_PER_BLOCK
+    return data[index * length:(index + 1) * length]
+```
+
+##### `get_column`
+
+```python
+def get_column(data: ExtendedData, index: LineIndex) -> DataColumn:
+    assert len(data) % NUMBER_OF_COLUMNS = 0
+    assert BYTES_PER_BLOB * 2 % NUMBER_OF_COLUMNS == 0
+
+    row_count = len(data) // NUMBER_OF_COLUMNS
+    column_width = BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS
+    column = []
+    for row in range(row_count):
+        start = row * NUMBER_OF_COLUMNS + column_index
+        column.append(data[start:start + column_width])
+    return column
+```
+
+##### `verify_column_sidecar`
+
+```python
+def verify_column_sidecar(sidecar: DataColumnSidecar) -> bool:
+    column = sidecar.column
+    column_width =  MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2
+    cell_count = len(column) // column_width
+    cells = [column[i * column_width:(i + 1) * column_width] for i in range(cell_count)]
+
+    assert len(cells) == len(sidecar.kzg_commitments) == len(sidecar.kzg_proofs)
+    # KZG batch verify the cells match the corresponding commitments and proofs
+    assert verify_cells(cells, sidecar.index, sidecar.kzg_commitments, sidecar.kzg_proofs)
+    # Verify if it's included in the beacon block
     return is_valid_merkle_branch(
         leaf=hash_tree_root(data_line_sidecar.kzg_commitments),
-        branch=data_line_sidecar.kzg_commitments_inclusion_proof,
-        depth=floorlog2(KZG_COMMITMENTS_INCLUSION_PROOF_INDEX),
-        index=KZG_COMMITMENTS_INCLUSION_PROOF_INDEX,
+        branch=data_line_sidecar.kzg_commitments_merkle_proof,
+        depth=floorlog2(KZG_COMMITMENTS_MERKLE_PROOF_INDEX),
+        index=KZG_COMMITMENTS_MERKLE_PROOF_INDEX,
         root=data_line_sidecar.signed_block_header.message.body_root,
     )
 ```
+
+TODO: define `verify_cells` helper.
 
 ### The gossip domain: gossipsub
 
@@ -94,21 +124,13 @@ Some gossip meshes are upgraded in the fork of Pe to support upgraded types.
 
 ##### Samples subnets
 
-###### `data_line_row_{line_index}`
+###### `data_column_{subnet_id}`
 
-This topic is used to propagate the row data line, where `line_index` maps to the index of the given column.
+This topic is used to propagate column sidecars, where each column maps to some `subnet_id`.
 
-The *type* of the payload of this topic is `DataLineSidecar`. It contains extra fields for verifying if the blob(s) of the row is included in the given `BeaconBlockHeader` with Merkle-proof.
+The *type* of the payload of this topic is `DataColumn`.
 
-TODO: add verification rules
-
-###### `data_line_column_{line_index}`
-
-This topic is used to propagate the column data line, where `line_index` maps the index of the given column.
-
-The *type* of the payload of this topic is `SlotDataLine`.
-
-TODO: add verification rules
+TODO: add verification rules. Verify with `verify_column_sidecar`.
 
 ### The Req/Resp domain
 
@@ -130,61 +152,58 @@ Request Content:
 Response Content:
 ```
 (
-  Bitvector[NUMBER_OF_ROWS * NUMBER_OF_COLUMNS]
+  Bitvector[MAX_BLOBS_PER_BLOCK * NUMBER_OF_COLUMNS]
 )
 ```
 
 The response bitfield indicates the samples of the given slot that the peer has and can provide.
 
-##### DASQuery v1
+##### DataRowByRootAndIndex v1
 
-**Protocol ID:** `/eth2/beacon_chain/req/das_query/1/`
+**Protocol ID:** `/eth2/beacon_chain/req/data_row_by_root_and_index/1/`
 
 The `<context-bytes>` field is calculated as `context = compute_fork_digest(fork_version, genesis_validators_root)`:
 
 Request Content:
 ```
 (
-  slot: Slot
-  sample_index: uint64
+  block_root: Root
+  index: LineIndex
 )
 ```
 
-`sample_index` maps the the index of the chunk in whole data in the flattened format (one-dimension).
+`index` maps the the row index of the extened data.
 
 Response Content:
 ```
 (
-  ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2 // (NUMBER_OF_ROWS * NUMBER_OF_COLUMNS)]
+  DataRow
 )
 ```
 
-##### DataLineQuery v1
+The response is the row as `get_row(data: ExtendedData, index: LineIndex)` computed.
 
-**Protocol ID:** `/eth2/beacon_chain/req/data_line_query/1/`
+##### DataColumnByRootAndIndex v1
+
+**Protocol ID:** `/eth2/beacon_chain/req/data_column_by_root_and_index/1/`
 
 The `<context-bytes>` field is calculated as `context = compute_fork_digest(fork_version, genesis_validators_root)`:
-
-[1]: # (eth2spec: skip)
-
-| `fork_version`           | Chunk SSZ type                |
-|--------------------------|-------------------------------|
-| `PEERDAS_FORK_VERSION`   | `peerdas.DataLine`           |
 
 Request Content:
 ```
 (
-  slot: Slot
-  line_type: uint64
-  line_index: uint64
+  block_root: Root
+  index: LineIndex
 )
 ```
 
-`line_type` may be `0` for row or `1` for column; `line_index` maps the the index of the given row or column.
+`index` maps the the column index of the extened data.
 
 Response Content:
 ```
 (
-  DataLine
+  DataColumn
 )
 ```
+
+The response is the column as `get_column(data: ExtendedData, index: LineIndex)` computed.

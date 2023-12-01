@@ -35,8 +35,7 @@
 
 | Name | Value | Description |
 | - | - | - |
-| `NUMBER_OF_ROWS` | `uint64(2**4)` (= 6) | Number of rows in the 2D data array. It's now set to `MAX_BLOBS_PER_BLOCK` value. |
-| `NUMBER_OF_COLUMNS` | `uint64(2**4)` (= 32) | Number of columns in the 2D data array |
+| `NUMBER_OF_COLUMNS` | `uint64(2**4)` (= 32) | Number of columns in the 1D data array |
 
 ### Custody setting
 
@@ -62,7 +61,7 @@ class LineType(enum.Enum):
 
 ```python
 def get_custody_lines(node_id: int, epoch: int, custody_size: int, line_type: LineType) -> list[int]:
-    bound = NUMBER_OF_ROWS if line_type else NUMBER_OF_COLUMNS
+    bound = MAX_BLOBS_PER_BLOCK if line_type else NUMBER_OF_COLUMNS
     all_items = list(range(bound))
     assert custody_size <= len(all_items)
     line_index = (node_id + epoch) % bound
@@ -75,7 +74,7 @@ def get_custody_lines(node_id: int, epoch: int, custody_size: int, line_type: Li
 
 Each node downloads and custodies a minimum of `CUSTODY_REQUIREMENT` rows and `CUSTODY_REQUIREMENT` columns per slot. The particular rows and columns that the node is required to custody are selected pseudo-randomly (more on this below).
 
-A node *may* choose to custody and serve more than the minimum honesty requirement. Such a node explicitly advertises a number greater than `CUSTODY_REQUIREMENT`  via the peer discovery mechanism -- for example, in their ENR (e.g. `custody_lines: 8` if the node custodies `8` rows and `8` columns each slot) -- up to a maximum of `max(NUMBER_OF_ROWS, NUMBER_OF_COLUMNS)` (i.e. a super-full node).
+A node *may* choose to custody and serve more than the minimum honesty requirement. Such a node explicitly advertises a number greater than `CUSTODY_REQUIREMENT`  via the peer discovery mechanism -- for example, in their ENR (e.g. `custody_lines: 8` if the node custodies `8` rows and `8` columns each slot) -- up to a maximum of `max(MAX_BLOBS_PER_BLOCK, NUMBER_OF_COLUMNS)` (i.e. a super-full node).
 
 A node stores the custodied rows/columns for the duration of the pruning period and responds to peer requests for samples on those rows/columns.
 
@@ -103,10 +102,10 @@ A node runs a background peer discovery process, maintaining at least `TARGET_NU
 
 ### Parameters
 
-There are both `NUMBER_OF_ROWS` row and `NUMBER_OF_COLUMNS` column gossip topics.
+There are both `MAX_BLOBS_PER_BLOCK` row and `NUMBER_OF_COLUMNS` column gossip topics.
 
 1. For each column -- `row_x` for `x` from `0` to `NUMBER_OF_COLUMNS` (non-inclusive). 
-2. For each row -- `column_y` for `y` from `0` to `NUMBER_OF_ROWS` (non-inclusive).
+2. For each row -- `column_y` for `y` from `0` to `MAX_BLOBS_PER_BLOCK` (non-inclusive).
 
 To custody a particular row or column, a node joins the respective gossip subnet. Verifiable samples from their respective row/column are gossiped on the assigned subnet.
 

@@ -79,7 +79,7 @@ def get_row(data: ExtendedData, index: LineIndex) -> DataRow:
 
 ```python
 def get_column(data: ExtendedData, index: LineIndex) -> DataColumn:
-    assert len(data) % NUMBER_OF_COLUMNS = 0
+    assert len(data) % NUMBER_OF_COLUMNS == 0
     assert BYTES_PER_BLOB * 2 % NUMBER_OF_COLUMNS == 0
 
     row_count = len(data) // NUMBER_OF_COLUMNS
@@ -96,7 +96,7 @@ def get_column(data: ExtendedData, index: LineIndex) -> DataColumn:
 ```python
 def verify_column_sidecar(sidecar: DataColumnSidecar) -> bool:
     column = sidecar.column
-    column_width =  MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2
+    column_width = BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS
     cell_count = len(column) // column_width
     cells = [column[i * column_width:(i + 1) * column_width] for i in range(cell_count)]
 

@@ -38,9 +38,10 @@ We define the following Python custom types for type hinting and readability:
 | Name | SSZ equivalent | Description |
 | - | - | - |
 | `ExtendedData` | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2]` | The full data with blobs and 1-D erasure coding extension |
-| `DataRow`   | `ByteList[BYTES_PER_BLOB * 2]` | The data of each row in PeerDAS |
-| `DataColumn`   | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS]` | The data of each column in PeerDAS |
-| `LineIndex`   | `uint64` | The index of the rows or columns in `ExtendedData` matrix |
+| `DataRow`      | `ByteList[BYTES_PER_BLOB * 2]` | The data of each row in PeerDAS |
+| `DataCell`     | `ByteList[BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS]` | The data unit of extended data matrix |
+| `DataColumn`   | `List[DataCell, MAX_BLOBS_PER_BLOCK]` | The data of each column in PeerDAS |
+| `LineIndex`    | `uint64` | The index of the rows or columns in `ExtendedData` matrix |
 
 ### Preset
 
@@ -80,15 +81,13 @@ def get_row(data: ExtendedData, index: LineIndex) -> DataRow:
 ```python
 def get_column(data: ExtendedData, index: LineIndex) -> DataColumn:
     assert len(data) % NUMBER_OF_COLUMNS == 0
-    assert BYTES_PER_BLOB * 2 % NUMBER_OF_COLUMNS == 0
-
     row_count = len(data) // NUMBER_OF_COLUMNS
     column_width = BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS
     column = []
-    for row in range(row_count):
-        start = row * NUMBER_OF_COLUMNS + column_index
-        column.append(data[start:start + column_width])
-    return column
+    for row_index in range(row_count):
+        start = row_index * NUMBER_OF_COLUMNS + column_index
+        column.append(DataCell(data[start:start + column_width]))
+    return DataColumn(column)
 ```
 
 ##### `verify_column_sidecar`

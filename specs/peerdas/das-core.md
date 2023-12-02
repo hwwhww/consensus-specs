@@ -35,7 +35,7 @@
 
 | Name | Value | Description |
 | - | - | - |
-| `NUMBER_OF_COLUMNS` | `uint64(2**4)` (= 32) | Number of columns in the 1D data array |
+| `NUMBER_OF_COLUMNS` | `uint64(2**4)` (= 32) | Number of columns in the extended data matrix. Invariant: `assert BYTES_PER_BLOB * 2 % NUMBER_OF_COLUMNS == 0` |
 
 ### Custody setting
 

@@ -8,16 +8,21 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+- [Custom types](#custom-types)
 - [Configuration](#configuration)
   - [Data size](#data-size)
   - [Custody setting](#custody-setting)
   - [Helper functions](#helper-functions)
     - [`LineType`](#linetype)
     - [`get_custody_lines`](#get_custody_lines)
+    - [`compute_extended_data`](#compute_extended_data)
+    - [`compute_extended_matrix`](#compute_extended_matrix)
+    - [`get_data_column_sidecar`](#get_data_column_sidecar)
 - [Custody](#custody)
   - [Custody requirement](#custody-requirement)
   - [Public, deterministic selection](#public-deterministic-selection)
 - [Peer discovery](#peer-discovery)
+- [Entended data](#entended-data)
 - [Row/Column gossip](#rowcolumn-gossip)
   - [Parameters](#parameters)
   - [Reconstruction and cross-seeding](#reconstruction-and-cross-seeding)
@@ -28,6 +33,19 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <!-- /TOC -->
+
+## Custom types
+
+We define the following Python custom types for type hinting and readability:
+
+| Name | SSZ equivalent | Description |
+| - | - | - |
+| `DataRow`      | `ByteList[BYTES_PER_BLOB * 2]` | The data of each row in PeerDAS |
+| `DataCell`     | `ByteList[BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS]` | The data unit of extended data matrix |
+| `DataColumn`   | `List[DataCell, MAX_BLOBS_PER_BLOCK]` | The data of each column in PeerDAS |
+| `ExtendedMatrix` | `List[DataCell, MAX_BLOBS_PER_BLOCK * NUMBER_OF_COLUMNS]` | The full data with blobs and one-dimension erasure coding extension |
+| `FlattenExtendedMatrix` | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2]` | The flatten format of `ExtendedMatrix` |
+| `LineIndex`    | `uint64` | The index of the rows or columns in `FlattenExtendedMatrix` matrix |
 
 ## Configuration
 
@@ -68,6 +86,56 @@ def get_custody_lines(node_id: int, epoch: int, custody_size: int, line_type: Li
     return [all_items[(line_index + i) % len(all_items)] for i in range(custody_size)]
 ```
 
+#### `compute_extended_data`
+
+```python
+def compute_extended_data(data: Sequence[BLSFieldElement]) -> Sequence[BLSFieldElement]:
+    # TODO
+    ...
+```
+
+#### `compute_extended_matrix`
+
+```python
+def compute_extended_matrix(blobs: Sequence[Blob]) -> FlattenExtendedMatrix:
+    matrix = bytearray()
+    for blob in blobs:
+        matrix.extend(compute_extended_data(blob))
+    return FlattenExtendedMatrix(matrix)
+```
+
+#### `get_data_column_sidecar`
+
+```python
+def get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[blobs]) -> DataColumnSidecar:
+    # Compute `DataColumn` from blobs
+    column = []
+    column_width = BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS
+    for blob_index, blob in enumerate(blobs):
+        extended_blob = compute_extended_data(blob)
+        start = blob_index * NUMBER_OF_COLUMNS + column_index
+        column.append(DataCell(extended_blob[start:start + column_width]))
+
+    # Compute proofs from blobs
+    # The given `block.body.blob_kzg_commitments` should have been verified as `blob_to_kzg_commitment(blob)` results
+    kzg_proofs = [
+        compute_blob_kzg_proof(blob, block.body.blob_kzg_commitments[blob_index])
+        for blob_index, blob in enumerate(blobs)
+    ]
+    signed_block_header = compute_signed_block_header(signed_block)
+    return DataColumnSidecar(
+        index=index,
+        column=DataColumn(column),
+        kzg_commitments=block.body.blob_kzg_commitments,
+        kzg_proofs=kzg_proofs,
+        signed_block_header=signed_block_header
+        kzg_commitment_merkle_proof=compute_merkle_proof(
+            block.body,
+            get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'),
+        ),
+    )
+```
+
 ## Custody
 
 ### Custody requirement
@@ -98,14 +166,16 @@ A node runs a background peer discovery process, maintaining at least `TARGET_NU
 
 *Note*: A DHT-based peer discovery mechanism is expected to be utilized in the above. The beacon-chain network currently utilizes discv5 in a similar method as described for finding peers of particular distributions of attestation subnets. Additional peer discovery methods are valuable to integrate (e.g., latent peer discovery via libp2p gossipsub) to add a defense in breadth against one of the discovery methods being attacked.
 
+## Entended data
+
+In this construction, we entend the blobs using one-dimension erasure coding extension. The matrix comprises maximum `MAX_BLOBS_PER_BLOCK` rows and fixed `NUMBER_OF_COLUMNS` columns, with each row containing a `Blob` and its corresponding extension.
+
 ## Row/Column gossip
 
 ### Parameters
 
-There are both `MAX_BLOBS_PER_BLOCK` row and `NUMBER_OF_COLUMNS` column gossip topics.
-
-1. For each column -- `row_x` for `x` from `0` to `NUMBER_OF_COLUMNS` (non-inclusive). 
-2. For each row -- `column_y` for `y` from `0` to `MAX_BLOBS_PER_BLOCK` (non-inclusive).
+1. For each row -- use `blob_sidecar_{subnet_id}` subnets, where each blob index maps to the `subnet_id`.
+2. For each column -- use `data_column_sidecar_{subnet_id}` subnets, where each column index maps to the `subnet_id`. The sidecar can be computed with `get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[blobs])` helper.
 
 To custody a particular row or column, a node joins the respective gossip subnet. Verifiable samples from their respective row/column are gossiped on the assigned subnet.
 
@@ -123,13 +193,11 @@ Additionally, the node should send (cross-seed) any samples missing from a given
 
 ## Peer sampling
 
-At each slot, a node makes (locally randomly determined) `SAMPLES_PER_SLOT` queries for samples from their peers. A node utilizes `get_custody_lines(..., line_type=LineType.ROW)`/`get_custody_lines(..., line_type=LineType.COLUMN)` to determine which peer(s) to request from. If a node has enough good/honest peers across all rows and columns, this has a high chance of success.
+At each slot, a node makes (locally randomly determined) `SAMPLES_PER_SLOT` queries for samples from their peers via `DataColumnSidecarByRoot` request. A node utilizes `get_custody_lines(..., line_type=LineType.ROW)`/`get_custody_lines(..., line_type=LineType.COLUMN)` to determine which peer(s) to request from. If a node has enough good/honest peers across all rows and columns, this has a high chance of success.
 
 ## Peer scoring
 
 Due to the deterministic custody functions, a node knows exactly what a peer should be able to respond to. In the event that a peer does not respond to samples of their custodied rows/columns, a node may downscore or disconnect from a peer.
-
-*Note*: a peer might not respond to requests either because they are dishonest (don't actually custody the data), because of bandwidth saturation (local throttling), or because they were, themselves, not able to get all the samples. In the first two cases, the peer is not of consistent DAS value and a node can/should seek to optimize for better peers. In the latter, the node can make local determinations based on repeated `DO_YOU_HAVE` queries to that peer and other peers to assess the value/honesty of the peer.
 
 ## DAS providers
 

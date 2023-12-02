@@ -9,39 +9,24 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Modifications in PeerDAS](#modifications-in-peerdas)
-  - [Custom types](#custom-types)
   - [Preset](#preset)
   - [Containers](#containers)
     - [`DataColumnSidecar`](#datacolumnsidecar)
+    - [`DataColumnIdentifier`](#datacolumnidentifier)
   - [Helpers](#helpers)
-      - [`get_row`](#get_row)
-      - [`get_column`](#get_column)
       - [`verify_column_sidecar`](#verify_column_sidecar)
   - [The gossip domain: gossipsub](#the-gossip-domain-gossipsub)
     - [Topics and messages](#topics-and-messages)
       - [Samples subnets](#samples-subnets)
-        - [`data_column_{subnet_id}`](#data_column_subnet_id)
+        - [`data_column_sidecar_{subnet_id}`](#data_column_sidecar_subnet_id)
   - [The Req/Resp domain](#the-reqresp-domain)
     - [Messages](#messages)
-      - [DataRowByRootAndIndex v1](#datarowbyrootandindex-v1)
-      - [DataColumnByRootAndIndex v1](#datacolumnbyrootandindex-v1)
+      - [DataColumnSidecarByRoot v1](#datacolumnsidecarbyroot-v1)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <!-- /TOC -->
 
 ## Modifications in PeerDAS
-
-### Custom types
-
-We define the following Python custom types for type hinting and readability:
-
-| Name | SSZ equivalent | Description |
-| - | - | - |
-| `ExtendedData` | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2]` | The full data with blobs and 1-D erasure coding extension |
-| `DataRow`      | `ByteList[BYTES_PER_BLOB * 2]` | The data of each row in PeerDAS |
-| `DataCell`     | `ByteList[BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS]` | The data unit of extended data matrix |
-| `DataColumn`   | `List[DataCell, MAX_BLOBS_PER_BLOCK]` | The data of each column in PeerDAS |
-| `LineIndex`    | `uint64` | The index of the rows or columns in `ExtendedData` matrix |
 
 ### Preset
 
@@ -55,7 +40,7 @@ We define the following Python custom types for type hinting and readability:
 
 ```python
 class DataColumnSidecar(Container):
-    index: LineIndex  # Index of column in extended data
+    index: LineIndex  # Index of column in extended matrix
     column: DataColumn
     kzg_commitments: List[KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK]
     kzg_proofs: List[KZGProof, MAX_BLOB_COMMITMENTS_PER_BLOCK]
@@ -63,32 +48,15 @@ class DataColumnSidecar(Container):
     kzg_commitment_merkle_proof: Vector[Bytes32, KZG_COMMITMENT_INCLUSION_PROOF_DEPTH]
 ```
 
+#### `DataColumnIdentifier`
+
+```python
+class DataColumnIdentifier(Container):
+    block_root: Root
+    index: LineIndex
+```
 
 ### Helpers
-
-##### `get_row`
-
-```python
-def get_row(data: ExtendedData, index: LineIndex) -> DataRow:
-    length = BYTES_PER_BLOB * 2
-    assert len(data) % (BYTES_PER_BLOB * 2) == 0
-    assert len(data) // (BYTES_PER_BLOB * 2) <= MAX_BLOBS_PER_BLOCK
-    return data[index * length:(index + 1) * length]
-```
-
-##### `get_column`
-
-```python
-def get_column(data: ExtendedData, index: LineIndex) -> DataColumn:
-    assert len(data) % NUMBER_OF_COLUMNS == 0
-    row_count = len(data) // NUMBER_OF_COLUMNS
-    column_width = BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS
-    column = []
-    for row_index in range(row_count):
-        start = row_index * NUMBER_OF_COLUMNS + column_index
-        column.append(DataCell(data[start:start + column_width]))
-    return DataColumn(column)
-```
 
 ##### `verify_column_sidecar`
 
@@ -122,7 +90,7 @@ Some gossip meshes are upgraded in the fork of Pe to support upgraded types.
 
 ##### Samples subnets
 
-###### `data_column_{subnet_id}`
+###### `data_column_sidecar_{subnet_id}`
 
 This topic is used to propagate column sidecars, where each column maps to some `subnet_id`.
 
@@ -134,52 +102,34 @@ TODO: add verification rules. Verify with `verify_column_sidecar`.
 
 #### Messages
 
-##### DataRowByRootAndIndex v1
+##### DataColumnSidecarByRoot v1
 
-**Protocol ID:** `/eth2/beacon_chain/req/data_row_by_root_and_index/1/`
+**Protocol ID:** `/eth2/beacon_chain/req/data_column_sidecar_by_root/1/`
 
-The `<context-bytes>` field is calculated as `context = compute_fork_digest(fork_version, genesis_validators_root)`:
-
-Request Content:
-```
-(
-  block_root: Root
-  index: LineIndex
-)
-```
-
-`index` maps the the row index of the extened data.
-
-Response Content:
-```
-(
-  DataRow
-)
-```
-
-The response is the row as `get_row(data: ExtendedData, index: LineIndex)` computed.
-
-##### DataColumnByRootAndIndex v1
-
-**Protocol ID:** `/eth2/beacon_chain/req/data_column_by_root_and_index/1/`
+*[New in Deneb:EIP4844]*
 
 The `<context-bytes>` field is calculated as `context = compute_fork_digest(fork_version, genesis_validators_root)`:
 
+[1]: # (eth2spec: skip)
+
+| `fork_version`           | Chunk SSZ type                |
+|--------------------------|-------------------------------|
+| `PEERDAS_FORK_VERSION`     | `peerdas.DataColumnSidecar`           |
+
 Request Content:
+
 ```
 (
-  block_root: Root
-  index: LineIndex
+  DataColumnIdentifier
 )
 ```
-
-`index` maps the the column index of the extened data.
 
 Response Content:
+
 ```
 (
-  DataColumn
+  DataColumnSidecar
 )
 ```
 
-The response is the column as `get_column(data: ExtendedData, index: LineIndex)` computed.
+The response is the column as `get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[blobs])` computed.

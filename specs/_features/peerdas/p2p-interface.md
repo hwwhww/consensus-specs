@@ -73,10 +73,10 @@ def verify_column_sidecar(sidecar: DataColumnSidecar) -> bool:
     # Verify if it's included in the beacon block
     return is_valid_merkle_branch(
         leaf=hash_tree_root(data_line_sidecar.kzg_commitments),
-        branch=data_line_sidecar.kzg_commitments_merkle_proof,
+        branch=sidecar.kzg_commitments_merkle_proof,
         depth=floorlog2(KZG_COMMITMENTS_MERKLE_PROOF_INDEX),
         index=KZG_COMMITMENTS_MERKLE_PROOF_INDEX,
-        root=data_line_sidecar.signed_block_header.message.body_root,
+        root=sidecar.signed_block_header.message.body_root,
     )
 ```
 

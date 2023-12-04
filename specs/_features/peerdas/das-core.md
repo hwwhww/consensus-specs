@@ -40,7 +40,7 @@ We define the following Python custom types for type hinting and readability:
 
 | Name | SSZ equivalent | Description |
 | - | - | - |
-| `DataCell`     | `ByteList[BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS]` | The data unit of extended data matrix |
+| `DataCell`     | `ByteVector[BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS]` | The data unit of extended data matrix |
 | `DataColumn`   | `List[DataCell, MAX_BLOBS_PER_BLOCK]` | The data of each column in PeerDAS |
 | `ExtendedMatrix` | `List[DataCell, MAX_BLOBS_PER_BLOCK * NUMBER_OF_COLUMNS]` | The full data with blobs and one-dimension erasure coding extension |
 | `FlattenExtendedMatrix` | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2]` | The flatten format of `ExtendedMatrix` |
@@ -78,7 +78,7 @@ class LineType(enum.Enum):
 
 ```python
 def get_custody_lines(node_id: int, epoch: int, custody_size: int, line_type: LineType) -> list[int]:
-    bound = MAX_BLOBS_PER_BLOCK if line_type else NUMBER_OF_COLUMNS
+    bound = NUMBER_OF_COLUMNS if line_type else MAX_BLOBS_PER_BLOCK
     all_items = list(range(bound))
     assert custody_size <= len(all_items)
     line_index = (node_id + epoch) % bound
@@ -106,7 +106,7 @@ def compute_extended_matrix(blobs: Sequence[Blob]) -> FlattenExtendedMatrix:
 #### `get_data_column_sidecar`
 
 ```python
-def get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[blobs]) -> DataColumnSidecar:
+def get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[Blob]) -> DataColumnSidecar:
     # Compute `DataColumn` from blobs
     column = []
     column_width = BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS
@@ -165,7 +165,7 @@ A node runs a background peer discovery process, maintaining at least `TARGET_NU
 
 *Note*: A DHT-based peer discovery mechanism is expected to be utilized in the above. The beacon-chain network currently utilizes discv5 in a similar method as described for finding peers of particular distributions of attestation subnets. Additional peer discovery methods are valuable to integrate (e.g., latent peer discovery via libp2p gossipsub) to add a defense in breadth against one of the discovery methods being attacked.
 
-## Entended data
+## Extended data
 
 In this construction, we entend the blobs using one-dimension erasure coding extension. The matrix comprises maximum `MAX_BLOBS_PER_BLOCK` rows and fixed `NUMBER_OF_COLUMNS` columns, with each row containing a `Blob` and its corresponding extension.
 
@@ -174,7 +174,7 @@ In this construction, we entend the blobs using one-dimension erasure coding ext
 ### Parameters
 
 1. For each row -- use `blob_sidecar_{subnet_id}` subnets, where each blob index maps to the `subnet_id`.
-2. For each column -- use `data_column_sidecar_{subnet_id}` subnets, where each column index maps to the `subnet_id`. The sidecar can be computed with `get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[blobs])` helper.
+2. For each column -- use `data_column_sidecar_{subnet_id}` subnets, where each column index maps to the `subnet_id`. The sidecar can be computed with `get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[Blob])` helper.
 
 To custody a particular row or column, a node joins the respective gossip subnet. Verifiable samples from their respective row/column are gossiped on the assigned subnet.
 

@@ -63,13 +63,19 @@ class DataColumnIdentifier(Container):
 ```python
 def verify_column_sidecar(sidecar: DataColumnSidecar) -> bool:
     column = sidecar.column
-    column_width = BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS
+    column_width = FIELD_ELEMENTS_PER_BLOB * 2 // NUMBER_OF_COLUMNS
     cell_count = len(column) // column_width
     cells = [column[i * column_width:(i + 1) * column_width] for i in range(cell_count)]
 
     assert len(cells) == len(sidecar.kzg_commitments) == len(sidecar.kzg_proofs)
     # KZG batch verify the cells match the corresponding commitments and proofs
-    assert verify_cells(cells, sidecar.index, sidecar.kzg_commitments, sidecar.kzg_proofs)
+    assert verify_sample_proof_batch(
+        row_commitments=sidecar.kzg_commitments,
+        row_ids=list(range(sidecar.column)),  # all rows
+        column_ids=[sidecar.index],
+        datas=cells,
+        proofs=sidecar.kzg_proofs
+    )
     # Verify if it's included in the beacon block
     return is_valid_merkle_branch(
         leaf=hash_tree_root(data_line_sidecar.kzg_commitments),

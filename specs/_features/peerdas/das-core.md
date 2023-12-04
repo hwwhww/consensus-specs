@@ -22,7 +22,7 @@
   - [Custody requirement](#custody-requirement)
   - [Public, deterministic selection](#public-deterministic-selection)
 - [Peer discovery](#peer-discovery)
-- [Entended data](#entended-data)
+- [Extended data](#extended-data)
 - [Row/Column gossip](#rowcolumn-gossip)
   - [Parameters](#parameters)
   - [Reconstruction and cross-seeding](#reconstruction-and-cross-seeding)
@@ -40,10 +40,10 @@ We define the following Python custom types for type hinting and readability:
 
 | Name | SSZ equivalent | Description |
 | - | - | - |
-| `DataCell`     | `ByteVector[BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS]` | The data unit of extended data matrix |
+| `DataCell`     | `Vector[BLSFieldElement, FIELD_ELEMENTS_PER_BLOB * 2 // NUMBER_OF_COLUMNS]` | The data unit of a cell in the extended data matrix |
 | `DataColumn`   | `List[DataCell, MAX_BLOBS_PER_BLOCK]` | The data of each column in PeerDAS |
 | `ExtendedMatrix` | `List[DataCell, MAX_BLOBS_PER_BLOCK * NUMBER_OF_COLUMNS]` | The full data with blobs and one-dimension erasure coding extension |
-| `FlattenExtendedMatrix` | `ByteList[MAX_BLOBS_PER_BLOCK * BYTES_PER_BLOB * 2]` | The flatten format of `ExtendedMatrix` |
+| `FlattenExtendedMatrix` | `List[BLSFieldElement, MAX_BLOBS_PER_BLOCK * FIELD_ELEMENTS_PER_BLOB * 2 * NUMBER_OF_COLUMNS]` | The flatten format of `ExtendedMatrix` |
 | `LineIndex`    | `uint64` | The index of the rows or columns in `FlattenExtendedMatrix` matrix |
 
 ## Configuration
@@ -52,7 +52,7 @@ We define the following Python custom types for type hinting and readability:
 
 | Name | Value | Description |
 | - | - | - |
-| `NUMBER_OF_COLUMNS` | `uint64(2**4)` (= 32) | Number of columns in the extended data matrix. Invariant: `assert BYTES_PER_BLOB * 2 % NUMBER_OF_COLUMNS == 0` |
+| `NUMBER_OF_COLUMNS` | `uint64(2**4)` (= 32) | Number of columns in the extended data matrix. Invariant: `assert FIELD_ELEMENTS_PER_BLOB * 2 % NUMBER_OF_COLUMNS == 0` |
 
 ### Custody setting
 
@@ -97,9 +97,7 @@ def compute_extended_data(data: Sequence[BLSFieldElement]) -> Sequence[BLSFieldE
 
 ```python
 def compute_extended_matrix(blobs: Sequence[Blob]) -> FlattenExtendedMatrix:
-    matrix = bytearray()
-    for blob in blobs:
-        matrix.extend(compute_extended_data(blob))
+    matrix = [compute_extended_data(blob) for blob in blobs]
     return FlattenExtendedMatrix(matrix)
 ```
 
@@ -109,7 +107,7 @@ def compute_extended_matrix(blobs: Sequence[Blob]) -> FlattenExtendedMatrix:
 def get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[Blob]) -> DataColumnSidecar:
     # Compute `DataColumn` from blobs
     column = []
-    column_width = BYTES_PER_BLOB * 2 // NUMBER_OF_COLUMNS
+    column_width = FIELD_ELEMENTS_PER_BLOB * 2 // NUMBER_OF_COLUMNS
     for blob_index, blob in enumerate(blobs):
         extended_blob = compute_extended_data(blob)
         start = blob_index * NUMBER_OF_COLUMNS + column_index

@@ -195,4 +195,3 @@ Response Content:
   DataColumnSidecar
 )
 ```
-

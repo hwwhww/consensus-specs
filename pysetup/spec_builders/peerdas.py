@@ -10,7 +10,6 @@ class PeerDASSpecBuilder(BaseSpecBuilder):
     @classmethod
     def imports(cls, preset_name: str):
         return f'''
-import enum
 from eth2spec.deneb import {preset_name} as deneb
 '''
     @classmethod

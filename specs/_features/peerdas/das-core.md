@@ -13,7 +13,6 @@
   - [Data size](#data-size)
   - [Custody setting](#custody-setting)
   - [Helper functions](#helper-functions)
-    - [`LineType`](#linetype)
     - [`get_custody_lines`](#get_custody_lines)
     - [`compute_extended_data`](#compute_extended_data)
     - [`compute_extended_matrix`](#compute_extended_matrix)
@@ -24,13 +23,15 @@
   - [Public, deterministic selection](#public-deterministic-selection)
 - [Peer discovery](#peer-discovery)
 - [Extended data](#extended-data)
-- [Row/Column gossip](#rowcolumn-gossip)
+- [Column gossip](#column-gossip)
   - [Parameters](#parameters)
   - [Reconstruction and cross-seeding](#reconstruction-and-cross-seeding)
 - [Peer sampling](#peer-sampling)
 - [Peer scoring](#peer-scoring)
 - [DAS providers](#das-providers)
 - [A note on fork choice](#a-note-on-fork-choice)
+- [FAQs](#faqs)
+  - [Row (blob) custody](#row-blob-custody)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <!-- /TOC -->
@@ -61,30 +62,19 @@ We define the following Python custom types for type hinting and readability:
 | Name | Value | Description |
 | - | - | - |
 | `SAMPLES_PER_SLOT` | `70` | Number of random samples a node queries per slot |
-| `CUSTODY_REQUIREMENT` | `2` | Minimum number of both rows and columns an honest node custodies and serves samples from |
+| `CUSTODY_REQUIREMENT` | `2` | Minimum number columns an honest node custodies and serves samples from |
 | `TARGET_NUMBER_OF_PEERS` | `70` | Suggested minimum peer count |
 
 ### Helper functions
 
-#### `LineType`
-
-Implementation-dependent helper for distinguishing the rows and columns in the following helpers.  
-
-```python
-class LineType(enum.Enum):
-    ROW = 0
-    COLUMN = 1
-```
-
 #### `get_custody_lines`
 
 ```python
-def get_custody_lines(node_id: int, epoch: int, custody_size: int, line_type: LineType) -> list[int]:
-    bound = NUMBER_OF_COLUMNS if line_type else MAX_BLOBS_PER_BLOCK
-    all_items = list(range(bound))
-    assert custody_size <= len(all_items)
-    line_index = (node_id + epoch) % bound
-    return [all_items[(line_index + i) % len(all_items)] for i in range(custody_size)]
+def get_custody_lines(node_id: NodeID, epoch: Epoch, custody_size: uint64) -> Sequence[LineIndex]:
+    assert custody_size <= MAX_BLOBS_PER_BLOCK
+    all_items = list(range(MAX_BLOBS_PER_BLOCK))
+    line_index = (node_id + epoch) % MAX_BLOBS_PER_BLOCK
+    return [LineIndex(all_items[(line_index + i) % len(all_items)]) for i in range(custody_size)]
 ```
 
 #### `compute_extended_data`
@@ -151,15 +141,15 @@ def get_data_column_sidecars(signed_block: SignedBeaconBlock,
 
 ### Custody requirement
 
-Each node downloads and custodies a minimum of `CUSTODY_REQUIREMENT` rows and `CUSTODY_REQUIREMENT` columns per slot. The particular rows and columns that the node is required to custody are selected pseudo-randomly (more on this below).
+Each node downloads and custodies a minimum of `CUSTODY_REQUIREMENT` columns per slot. The particular columns that the node is required to custody are selected pseudo-randomly (more on this below).
 
-A node *may* choose to custody and serve more than the minimum honesty requirement. Such a node explicitly advertises a number greater than `CUSTODY_REQUIREMENT`  via the peer discovery mechanism -- for example, in their ENR (e.g. `custody_lines: 8` if the node custodies `8` rows and `8` columns each slot) -- up to a maximum of `max(MAX_BLOBS_PER_BLOCK, NUMBER_OF_COLUMNS)` (i.e. a super-full node).
+A node *may* choose to custody and serve more than the minimum honesty requirement. Such a node explicitly advertises a number greater than `CUSTODY_REQUIREMENT`  via the peer discovery mechanism -- for example, in their ENR (e.g. `custody_lines: 8` if the node custodies `8` columns each slot) -- up to a `NUMBER_OF_COLUMNS` (i.e. a super-full node).
 
-A node stores the custodied rows/columns for the duration of the pruning period and responds to peer requests for samples on those rows/columns.
+A node stores the custodied columns for the duration of the pruning period and responds to peer requests for samples on those columns.
 
 ### Public, deterministic selection 
 
-The particular rows and columns that a node custodies are selected pseudo-randomly as a function (`get_custody_lines`) of the node-id, epoch, and custody size -- importantly this function can be run by any party as the inputs are all public.
+The particular columns that a node custodies are selected pseudo-randomly as a function (`get_custody_lines`) of the node-id, epoch, and custody size -- importantly this function can be run by any party as the inputs are all public.
 
 *Note*: increasing the `custody_size` parameter for a given `node_id` and `epoch` extends the returned list (rather than being an entirely new shuffle) such that if `custody_size` is unknown, the default `CUSTODY_REQUIREMENT` will be correct for a subset of the node's custody.
 
@@ -167,9 +157,9 @@ The particular rows and columns that a node custodies are selected pseudo-random
 
 ## Peer discovery
 
-At each slot, a node needs to be able to readily sample from *any* set of rows and columns. To this end, a node should find and maintain a set of diverse and reliable peers that can regularly satisfy their sampling demands.
+At each slot, a node needs to be able to readily sample from *any* set of columns. To this end, a node should find and maintain a set of diverse and reliable peers that can regularly satisfy their sampling demands.
 
-A node runs a background peer discovery process, maintaining at least `TARGET_NUMBER_OF_PEERS` of various custody distributions (both custody_size and row/column assignments). The combination of advertised `custody_size` size and public node-id make this readily and publicly accessible.
+A node runs a background peer discovery process, maintaining at least `TARGET_NUMBER_OF_PEERS` of various custody distributions (both custody_size and column assignments). The combination of advertised `custody_size` size and public node-id make this readily and publicly accessible.
 
 `TARGET_NUMBER_OF_PEERS` should be tuned upward in the event of failed sampling.
 
@@ -181,20 +171,17 @@ A node runs a background peer discovery process, maintaining at least `TARGET_NU
 
 In this construction, we entend the blobs using one-dimension erasure coding extension. The matrix comprises maximum `MAX_BLOBS_PER_BLOCK` rows and fixed `NUMBER_OF_COLUMNS` columns, with each row containing a `Blob` and its corresponding extension.
 
-## Row/Column gossip
+## Column gossip
 
 ### Parameters
 
-1. For each row -- use `blob_sidecar_{subnet_id}` subnets, where each blob index maps to the `subnet_id`.
-2. For each column -- use `data_column_sidecar_{subnet_id}` subnets, where each column index maps to the `subnet_id`. The sidecars can be computed with `get_data_column_sidecars(signed_block: SignedBeaconBlock, blobs: Sequence[Blob])[]` helper.
+For each column -- use `data_column_sidecar_{subnet_id}` subnets, where each column index maps to the `subnet_id`. The sidecars can be computed with `get_data_column_sidecars(signed_block: SignedBeaconBlock, blobs: Sequence[Blob])[]` helper.
 
-To custody a particular row or column, a node joins the respective gossip subnet. Verifiable samples from their respective row/column are gossiped on the assigned subnet.
+To custody a particular column, a node joins the respective gossip subnet. Verifiable samples from their respective column are gossiped on the assigned subnet.
 
 ### Reconstruction and cross-seeding
 
-In the event a node does *not* receive all samples for a given row/column but does receive enough to reconstruct (e.g., 50%+, a function of coding rate), the node should reconstruct locally and send the reconstructed samples on the subnet.
-
-Additionally, the node should send (cross-seed) any samples missing from a given row/column they are assigned to that they have obtained via an alternative method (ancillary gossip or reconstruction). E.g., if the node reconstructs `row_x` and is also participating in the `column_y` subnet in which the `(x, y)` sample was missing, send the reconstructed sample to `column_y`.
+In the event a node does *not* receive all samples for a given column but does receive enough to reconstruct (e.g., 50%+, a function of coding rate), the node should reconstruct locally and send the reconstructed samples on the subnet.
 
 *Note*: A node always maintains a matrix view of the rows and columns they are following, able to cross-reference and cross-seed in either direction.
 
@@ -204,7 +191,7 @@ Additionally, the node should send (cross-seed) any samples missing from a given
 
 ## Peer sampling
 
-At each slot, a node makes (locally randomly determined) `SAMPLES_PER_SLOT` queries for samples from their peers via `DataColumnSidecarByRoot` request. A node utilizes `get_custody_lines(..., line_type=LineType.ROW)`/`get_custody_lines(..., line_type=LineType.COLUMN)` to determine which peer(s) to request from. If a node has enough good/honest peers across all rows and columns, this has a high chance of success.
+At each slot, a node makes (locally randomly determined) `SAMPLES_PER_SLOT` queries for samples from their peers via `DataColumnSidecarByRoot` request. A node utilizes `get_custody_lines` helper to determine which peer(s) to request from. If a node has enough good/honest peers across all rows and columns, this has a high chance of success.
 
 ## Peer scoring
 
@@ -227,3 +214,16 @@ In any DAS design, there are probably a few degrees of freedom around timing, ac
 For example, the fork choice rule might require validators to do successful DAS on slot N to be able to include block of slot `N` in its fork choice. That's the tightest DA filter. But trailing filters are also probably acceptable, knowing that there might be some failures/short re-orgs but that they don't hurt the aggregate security. For example, the rule could be — DAS must be completed for slot N-1 for a child block in N to be included in the fork choice.
 
 Such trailing techniques and their analysis will be valuable for any DAS construction. The question is — can you relax how quickly you need to do DA and in the worst case not confirm unavailable data via attestations/finality, and what impact does it have on short-term re-orgs and fast confirmation rules.
+
+## FAQs
+
+### Row (blob) custody
+
+In the one-dimension construction, a node samples the peers by requesting the whole `DataColumn`. In reconstruction, a node can reconstruct all the blobs by 50% of the columns. Note that nodes can still download the row via `blob_sidecar_{subnet_id}` subnets.
+
+The potential benefits of having row custody could include:
+
+1. Allow for more "natural" distribution of data to consumers -- e.g., roll-ups -- but honestly, they won't know a priori which row their blob is going to be included in in the block, so they would either need to listen to all rows or download a particular row after seeing the block. The former looks just like listening to column [0, N)  and the latter is req/resp instead of gossiping.
+2. Help with some sort of distributed reconstruction. Those with full rows can compute extensions and seed missing samples to the network. This would either need to be able to send individual points on the gossip or would need some sort of req/resp faculty, potentially similar to an `IHAVEPOINTBITFIELD` and `IWANTSAMPLE`.
+
+However, for simplicity, we don't assign row custody assignments to nodes in the current design.

@@ -68,7 +68,7 @@ We define the following Python custom types for type hinting and readability:
 
 #### `LineType`
 
-It is implementation-dependent helpers for distinguishing the rows and columns in the following helpers.  
+Implementation-dependent helper for distinguishing the rows and columns in the following helpers.  
 
 ```python
 class LineType(enum.Enum):
@@ -214,9 +214,9 @@ Due to the deterministic custody functions, a node knows exactly what a peer sho
 
 A DAS provider is a consistently-available-for-DAS-queries, super-full (or high capacity) node. To the p2p, these look just like other nodes but with high advertised capacity, and they should generally be able to be latently found via normal discovery.
 
-They can also be found out-of-band and configured into a node to connect to directly and prioritize. For example, some L2 DAO might support 10 super-full nodes as a public good, and nodes could choose to add some set of these to their local configuration to bolster their DAS quality of service.
+DAS providers can also be found out-of-band and configured into a node to connect to directly and prioritize. Nodes can add some set of these to their local configuration for persistent connection to bolster their DAS quality of service.
 
-Such direct peering utilizes a feature supported out of the box today on all nodes and can complement (and reduce attackability) alternative peer discovery mechanisms.
+Such direct peering utilizes a feature supported out of the box today on all nodes and can complement (and reduce attackability and increase quality-of-service) alternative peer discovery mechanisms.
 
 ## A note on fork choice
 

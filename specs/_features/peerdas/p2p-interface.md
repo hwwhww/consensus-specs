@@ -196,4 +196,3 @@ Response Content:
 )
 ```
 
-The response is the column as `get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[Blob], column_index: LineIndex)` computed.

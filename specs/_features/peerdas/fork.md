@@ -12,7 +12,7 @@
 - [Helper functions](#helper-functions)
   - [Misc](#misc)
     - [Modified `compute_fork_version`](#modified-compute_fork_version)
-- [Fork to PeerDAS](#fork-to-PeerDAS)
+- [Fork to PeerDAS](#fork-to-peerdas)
   - [Fork trigger](#fork-trigger)
   - [Upgrading the state](#upgrading-the-state)
 

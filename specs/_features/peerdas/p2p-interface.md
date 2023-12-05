@@ -10,11 +10,15 @@
 
 - [Modifications in PeerDAS](#modifications-in-peerdas)
   - [Preset](#preset)
+  - [Configuration](#configuration)
   - [Containers](#containers)
     - [`DataColumnSidecar`](#datacolumnsidecar)
     - [`DataColumnIdentifier`](#datacolumnidentifier)
   - [Helpers](#helpers)
-      - [`verify_column_sidecar`](#verify_column_sidecar)
+      - [`verify_sample_proof_batch`](#verify_sample_proof_batch)
+      - [`verify_data_column_sidecar_kzg_proof`](#verify_data_column_sidecar_kzg_proof)
+      - [`verify_data_column_sidecar_inclusion_proof`](#verify_data_column_sidecar_inclusion_proof)
+      - [`compute_subnet_for_data_column_sidecar`](#compute_subnet_for_data_column_sidecar)
   - [The gossip domain: gossipsub](#the-gossip-domain-gossipsub)
     - [Topics and messages](#topics-and-messages)
       - [Samples subnets](#samples-subnets)
@@ -33,6 +37,12 @@
 | Name                                     | Value                             | Description                                                         |
 |------------------------------------------|-----------------------------------|---------------------------------------------------------------------|
 | `KZG_COMMITMENTS_MERKLE_PROOF_INDEX`   | `uint64(get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'))` (= 27) | <!-- predefined --> Merkle proof index for `blob_kzg_commitments` |
+
+### Configuration
+
+| Name                                     | Value                             | Description                                                         |
+|------------------------------------------|-----------------------------------|---------------------------------------------------------------------|
+| `DATA_COLUMN_SIDECAR_SUBNET_COUNT`              | `32`                               | The number of data column sidecar subnets used in the gossipsub protocol.  |
 
 ### Containers
 
@@ -73,24 +83,35 @@ def verify_sample_proof_batch(
     ...
 ```
 
-##### `verify_column_sidecar`
+##### `verify_data_column_sidecar_kzg_proof`
 
 ```python
-def verify_column_sidecar(sidecar: DataColumnSidecar) -> bool:
+def verify_data_column_sidecar_kzg_proof(sidecar: DataColumnSidecar) -> bool:
+    """
+    Verify if the commitment are correct
+    """
     column = sidecar.column
     cell_count = len(column) // FIELD_ELEMENTS_PER_CELL
     cells = [column[i * FIELD_ELEMENTS_PER_CELL:(i + 1) * FIELD_ELEMENTS_PER_CELL] for i in range(cell_count)]
 
     assert len(cells) == len(sidecar.kzg_commitments) == len(sidecar.kzg_proofs)
     # KZG batch verify the cells match the corresponding commitments and proofs
-    assert verify_sample_proof_batch(
+    return verify_sample_proof_batch(
         row_commitments=sidecar.kzg_commitments,
         row_ids=list(range(sidecar.column)),  # all rows
         column_ids=[sidecar.index],
         datas=cells,
         proofs=sidecar.kzg_proofs
     )
-    # Verify if it's included in the beacon block
+```
+
+##### `verify_data_column_sidecar_inclusion_proof`
+
+```python
+def verify_data_column_sidecar_inclusion_proof(sidecar: DataColumnSidecar) -> bool:
+    """
+    Verify if the given KZG commitments included in the given beacon block.
+    """
     return is_valid_merkle_branch(
         leaf=hash_tree_root(sidecar.kzg_commitments),
         branch=sidecar.kzg_commitments_merkle_proof,
@@ -100,7 +121,13 @@ def verify_column_sidecar(sidecar: DataColumnSidecar) -> bool:
     )
 ```
 
-TODO: define `verify_cells` helper.
+##### `compute_subnet_for_data_column_sidecar`
+
+```python
+def compute_subnet_for_data_column_sidecar(column_index: LineIndex) -> SubnetID:
+    return SubnetID(column_index % DATA_COLUMN_SIDECAR_SUBNET_COUNT)
+```
+
 
 ### The gossip domain: gossipsub
 
@@ -116,7 +143,24 @@ This topic is used to propagate column sidecars, where each column maps to some 
 
 The *type* of the payload of this topic is `DataColumn`.
 
-TODO: add verification rules. Verify with `verify_column_sidecar`.
+The following validations MUST pass before forwarding the `sidecar: DataColumnSidecar` on the network, assuming the alias `block_header = blob_sidecar.signed_block_header.message`:
+
+- _[REJECT]_ The sidecar's index is consistent with `NUMBER_OF_COLUMNS` -- i.e. `sidecar.index < NUMBER_OF_COLUMNS`.
+- _[REJECT]_ The sidecar is for the correct subnet -- i.e. `compute_subnet_for_data_column_sidecar(blob_sidecar.index) == subnet_id`.
+- _[IGNORE]_ The sidecar is not from a future slot (with a `MAXIMUM_GOSSIP_CLOCK_DISPARITY` allowance) -- i.e. validate that `block_header.slot <= current_slot` (a client MAY queue future sidecars for processing at the appropriate slot).
+- _[IGNORE]_ The sidecar is from a slot greater than the latest finalized slot -- i.e. validate that `block_header.slot > compute_start_slot_at_epoch(state.finalized_checkpoint.epoch)`
+- _[REJECT]_ The proposer signature of `blob_sidecar.signed_block_header`, is valid with respect to the `block_header.proposer_index` pubkey.
+- _[IGNORE]_ The sidecar's block's parent (defined by `block_header.parent_root`) has been seen (via both gossip and non-gossip sources) (a client MAY queue sidecars for processing once the parent block is retrieved).
+- _[REJECT]_ The sidecar's block's parent (defined by `block_header.parent_root`) passes validation.
+- _[REJECT]_ The sidecar is from a higher slot than the sidecar's block's parent (defined by `block_header.parent_root`).
+- _[REJECT]_ The current finalized_checkpoint is an ancestor of the sidecar's block -- i.e. `get_checkpoint_block(store, block_header.parent_root, store.finalized_checkpoint.epoch) == store.finalized_checkpoint.root`.
+- _[REJECT]_ The sidecar's `kzg_commitments` field inclusion proof is valid as verified by `verify_data_column_sidecar_inclusion_proof(sidecar)`.
+- _[REJECT]_ The sidecar's column data is valid as verified by `verify_data_column_sidecar_kzg_proof(sidecar)`.
+- _[IGNORE]_ The sidecar is the first sidecar for the tuple `(block_header.slot, block_header.proposer_index, sidecar.index)` with valid header signature, sidecar inclusion proof, and kzg proof.
+- _[REJECT]_ The sidecar is proposed by the expected `proposer_index` for the block's slot in the context of the current shuffling (defined by `block_header.parent_root`/`block_header.slot`).
+  If the `proposer_index` cannot immediately be verified against the expected shuffling, the sidecar MAY be queued for later processing while proposers for the block's branch are calculated -- in such a case _do not_ `REJECT`, instead `IGNORE` this message.
+
+*Note:* In the `verify_data_column_sidecar_inclusion_proof(sidecar)` check, it should verify against the same set of `kzg_commitments` of the given beacon beacon. Client can choose to cache the result of the arguments tuple `(sidecar.kzg_commitments, sidecar.kzg_commitments_merkle_proof, sidecar.signed_block_header)`.
 
 ### The Req/Resp domain
 
@@ -152,4 +196,4 @@ Response Content:
 )
 ```
 
-The response is the column as `get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[blobs])` computed.
+The response is the column as `get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[Blob], column_index: LineIndex)` computed.

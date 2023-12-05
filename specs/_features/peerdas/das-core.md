@@ -40,7 +40,7 @@ We define the following Python custom types for type hinting and readability:
 
 | Name | SSZ equivalent | Description |
 | - | - | - |
-| `DataCell`     | `Vector[BLSFieldElement, FIELD_ELEMENTS_PER_BLOB * 2 // NUMBER_OF_COLUMNS]` | The data unit of a cell in the extended data matrix |
+| `DataCell`     | `Vector[BLSFieldElement, FIELD_ELEMENTS_PER_CELL]` | The data unit of a cell in the extended data matrix |
 | `DataColumn`   | `List[DataCell, MAX_BLOBS_PER_BLOCK]` | The data of each column in PeerDAS |
 | `ExtendedMatrix` | `List[DataCell, MAX_BLOBS_PER_BLOCK * NUMBER_OF_COLUMNS]` | The full data with blobs and one-dimension erasure coding extension |
 | `FlattenExtendedMatrix` | `List[BLSFieldElement, MAX_BLOBS_PER_BLOCK * FIELD_ELEMENTS_PER_BLOB * 2 * NUMBER_OF_COLUMNS]` | The flatten format of `ExtendedMatrix` |
@@ -52,7 +52,8 @@ We define the following Python custom types for type hinting and readability:
 
 | Name | Value | Description |
 | - | - | - |
-| `NUMBER_OF_COLUMNS` | `uint64(2**4)` (= 32) | Number of columns in the extended data matrix. Invariant: `assert FIELD_ELEMENTS_PER_BLOB * 2 % NUMBER_OF_COLUMNS == 0` |
+| `NUMBER_OF_COLUMNS` | `uint64(2**6)` (= 32) | Number of columns in the extended data matrix. Invariant: `assert FIELD_ELEMENTS_PER_BLOB * 2 % NUMBER_OF_COLUMNS == 0` |
+| `FIELD_ELEMENTS_PER_CELL` | `FIELD_ELEMENTS_PER_BLOB * 2 // NUMBER_OF_COLUMNS` | Elements per `DataCell` |
 
 ### Custody setting
 
@@ -104,14 +105,18 @@ def compute_extended_matrix(blobs: Sequence[Blob]) -> FlattenExtendedMatrix:
 #### `get_data_column_sidecar`
 
 ```python
-def get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[Blob]) -> DataColumnSidecar:
+def get_data_column_sidecar(signed_block: SignedBeaconBlock,
+                            blobs: Sequence[Blob],
+                            column_index: LineIndex) -> DataColumnSidecar:
     # Compute `DataColumn` from blobs
     column = []
-    column_width = FIELD_ELEMENTS_PER_BLOB * 2 // NUMBER_OF_COLUMNS
     for blob_index, blob in enumerate(blobs):
         extended_blob = compute_extended_data(blob)
         start = blob_index * NUMBER_OF_COLUMNS + column_index
-        column.append(DataCell(extended_blob[start:start + column_width]))
+        column.append(DataCell(extended_blob[start:start + FIELD_ELEMENTS_PER_CELL]))
+
+    signed_block_header = compute_signed_block_header(signed_block)
+    block = signed_block.message
 
     # Compute proofs from blobs
     # The given `block.body.blob_kzg_commitments` should have been verified as `blob_to_kzg_commitment(blob)` results
@@ -119,13 +124,12 @@ def get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[Blo
         compute_blob_kzg_proof(blob, block.body.blob_kzg_commitments[blob_index])
         for blob_index, blob in enumerate(blobs)
     ]
-    signed_block_header = compute_signed_block_header(signed_block)
     return DataColumnSidecar(
-        index=index,
+        index=column_index,
         column=DataColumn(column),
         kzg_commitments=block.body.blob_kzg_commitments,
         kzg_proofs=kzg_proofs,
-        signed_block_header=signed_block_header
+        signed_block_header=signed_block_header,
         kzg_commitment_merkle_proof=compute_merkle_proof(
             block.body,
             get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'),

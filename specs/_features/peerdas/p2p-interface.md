@@ -58,14 +58,28 @@ class DataColumnIdentifier(Container):
 
 ### Helpers
 
+##### `verify_sample_proof_batch`
+
+```python
+def verify_sample_proof_batch(
+        row_commitments: Sequence[KZGCommitment],
+        row_ids: Sequence[LineIndex],
+        column_ids: Sequence[LineIndex],
+        datas: Sequence[Vector[BLSFieldElement, FIELD_ELEMENTS_PER_CELL]],
+        proofs: Sequence[KZGProof]) -> bool:
+    """
+    Defined in polynomial-commitments-sampling.md
+    """
+    ...
+```
+
 ##### `verify_column_sidecar`
 
 ```python
 def verify_column_sidecar(sidecar: DataColumnSidecar) -> bool:
     column = sidecar.column
-    column_width = FIELD_ELEMENTS_PER_BLOB * 2 // NUMBER_OF_COLUMNS
-    cell_count = len(column) // column_width
-    cells = [column[i * column_width:(i + 1) * column_width] for i in range(cell_count)]
+    cell_count = len(column) // FIELD_ELEMENTS_PER_CELL
+    cells = [column[i * FIELD_ELEMENTS_PER_CELL:(i + 1) * FIELD_ELEMENTS_PER_CELL] for i in range(cell_count)]
 
     assert len(cells) == len(sidecar.kzg_commitments) == len(sidecar.kzg_proofs)
     # KZG batch verify the cells match the corresponding commitments and proofs
@@ -78,7 +92,7 @@ def verify_column_sidecar(sidecar: DataColumnSidecar) -> bool:
     )
     # Verify if it's included in the beacon block
     return is_valid_merkle_branch(
-        leaf=hash_tree_root(data_line_sidecar.kzg_commitments),
+        leaf=hash_tree_root(sidecar.kzg_commitments),
         branch=sidecar.kzg_commitments_merkle_proof,
         depth=floorlog2(KZG_COMMITMENTS_MERKLE_PROOF_INDEX),
         index=KZG_COMMITMENTS_MERKLE_PROOF_INDEX,

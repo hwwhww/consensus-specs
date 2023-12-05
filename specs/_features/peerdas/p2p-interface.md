@@ -55,7 +55,7 @@ class DataColumnSidecar(Container):
     kzg_commitments: List[KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK]
     kzg_proofs: List[KZGProof, MAX_BLOB_COMMITMENTS_PER_BLOCK]
     signed_block_header: SignedBeaconBlockHeader
-    kzg_commitment_merkle_proof: Vector[Bytes32, KZG_COMMITMENT_INCLUSION_PROOF_DEPTH]
+    kzg_commitments_merkle_proof: Vector[Bytes32, floorlog2(KZG_COMMITMENTS_MERKLE_PROOF_INDEX)]
 ```
 
 #### `DataColumnIdentifier`

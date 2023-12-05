@@ -17,7 +17,8 @@
     - [`get_custody_lines`](#get_custody_lines)
     - [`compute_extended_data`](#compute_extended_data)
     - [`compute_extended_matrix`](#compute_extended_matrix)
-    - [`get_data_column_sidecar`](#get_data_column_sidecar)
+    - [`compute_samples_and_proofs`](#compute_samples_and_proofs)
+    - [`get_data_column_sidecars`](#get_data_column_sidecars)
 - [Custody](#custody)
   - [Custody requirement](#custody-requirement)
   - [Public, deterministic selection](#public-deterministic-selection)
@@ -102,39 +103,48 @@ def compute_extended_matrix(blobs: Sequence[Blob]) -> FlattenExtendedMatrix:
     return FlattenExtendedMatrix(matrix)
 ```
 
-#### `get_data_column_sidecar`
+#### `compute_samples_and_proofs`
 
 ```python
-def get_data_column_sidecar(signed_block: SignedBeaconBlock,
-                            blobs: Sequence[Blob],
-                            column_index: LineIndex) -> DataColumnSidecar:
-    # Compute `DataColumn` from blobs
-    column = []
-    for blob_index, blob in enumerate(blobs):
-        extended_blob = compute_extended_data(blob)
-        start = blob_index * NUMBER_OF_COLUMNS + column_index
-        column.append(DataCell(extended_blob[start:start + FIELD_ELEMENTS_PER_CELL]))
+def compute_samples_and_proofs(blob: Blob) -> Tuple[
+        Vector[DataCell, NUMBER_OF_COLUMNS * 2],
+        Vector[KZGProof, NUMBER_OF_COLUMNS * 2]]:
+    """
+    Defined in polynomial-commitments-sampling.md
+    """
+    ...
+```
 
+#### `get_data_column_sidecars`
+
+```python
+def get_data_column_sidecars(signed_block: SignedBeaconBlock,
+                             blobs: Sequence[Blob]) -> Sequence[DataColumnSidecar]:
     signed_block_header = compute_signed_block_header(signed_block)
     block = signed_block.message
+    kzg_commitment_merkle_proof = compute_merkle_proof(
+        block.body,
+        get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'),
+    ),
 
-    # Compute proofs from blobs
-    # The given `block.body.blob_kzg_commitments` should have been verified as `blob_to_kzg_commitment(blob)` results
-    kzg_proofs = [
-        compute_blob_kzg_proof(blob, block.body.blob_kzg_commitments[blob_index])
-        for blob_index, blob in enumerate(blobs)
-    ]
-    return DataColumnSidecar(
-        index=column_index,
-        column=DataColumn(column),
-        kzg_commitments=block.body.blob_kzg_commitments,
-        kzg_proofs=kzg_proofs,
-        signed_block_header=signed_block_header,
-        kzg_commitment_merkle_proof=compute_merkle_proof(
-            block.body,
-            get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'),
-        ),
-    )
+    all_cells_and_proofs = [compute_samples_and_proofs(blob) for blob in enumerate(blobs)]
+
+    sidecars = []
+    for column_index in range(NUMBER_OF_COLUMNS):
+        column = DataColumn([all_cells_and_proofs[0][column_index + MAX_BLOBS_PER_BLOCK * i]
+                             for i in MAX_BLOBS_PER_BLOCK])
+        kzg_proof_of_column = [all_cells_and_proofs[1][column_index + MAX_BLOBS_PER_BLOCK * i]
+                               for i in MAX_BLOBS_PER_BLOCK]
+
+        sidecars.append(DataColumnSidecar(
+            index=column_index,
+            column=column,
+            kzg_commitments=block.body.blob_kzg_commitments,
+            kzg_proofs=kzg_proof_of_column,
+            signed_block_header=signed_block_header,
+            kzg_commitments_merkle_proof=kzg_commitment_merkle_proof,
+        ))
+    return sidecars
 ```
 
 ## Custody
@@ -176,7 +186,7 @@ In this construction, we entend the blobs using one-dimension erasure coding ext
 ### Parameters
 
 1. For each row -- use `blob_sidecar_{subnet_id}` subnets, where each blob index maps to the `subnet_id`.
-2. For each column -- use `data_column_sidecar_{subnet_id}` subnets, where each column index maps to the `subnet_id`. The sidecar can be computed with `get_data_column_sidecar(signed_block: SignedBeaconBlock, blobs: Sequence[Blob])` helper.
+2. For each column -- use `data_column_sidecar_{subnet_id}` subnets, where each column index maps to the `subnet_id`. The sidecars can be computed with `get_data_column_sidecars(signed_block: SignedBeaconBlock, blobs: Sequence[Blob])[]` helper.
 
 To custody a particular row or column, a node joins the respective gossip subnet. Verifiable samples from their respective row/column are gossiped on the assigned subnet.
 

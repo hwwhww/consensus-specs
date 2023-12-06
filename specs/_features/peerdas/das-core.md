@@ -61,7 +61,7 @@ We define the following Python custom types for type hinting and readability:
 
 | Name | Value | Description |
 | - | - | - |
-| `SAMPLES_PER_SLOT` | `70` | Number of random samples a node queries per slot |
+| `SAMPLES_PER_SLOT` | `8` | Number of random samples a node queries per slot |
 | `CUSTODY_REQUIREMENT` | `2` | Minimum number columns an honest node custodies and serves samples from |
 | `TARGET_NUMBER_OF_PEERS` | `70` | Suggested minimum peer count |
 

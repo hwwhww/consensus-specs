@@ -181,7 +181,11 @@ To custody a particular column, a node joins the respective gossip subnet. Verif
 
 ### Reconstruction and cross-seeding
 
-In the event a node does *not* receive all samples for a given column but does receive enough to reconstruct (e.g., 50%+, a function of coding rate), the node should reconstruct locally and send the reconstructed samples on the subnet.
+If the node obtains 50%+ of all the columns, they can reconstruct the full data matrix via `recover_samples_impl` helper.
+
+If a node fails to sample a peer or fails to get a column on the column subnet, a node can utilize the Req/Resp message to query the missing column from other peers.
+
+Once the node obtain the column, the node should send the missing columns to the column subnets.
 
 *Note*: A node always maintains a matrix view of the rows and columns they are following, able to cross-reference and cross-seed in either direction.
 

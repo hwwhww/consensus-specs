@@ -36,7 +36,7 @@
 
 | Name                                     | Value                             | Description                                                         |
 |------------------------------------------|-----------------------------------|---------------------------------------------------------------------|
-| `KZG_COMMITMENTS_MERKLE_PROOF_INDEX`   | `uint64(get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'))` (= 27) | <!-- predefined --> Merkle proof index for `blob_kzg_commitments` |
+| `KZG_COMMITMENTS_INCLUSION_PROOF_DEPTH`   | `uint64(floorlog2(get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments')))` (= 4) | <!-- predefined --> Merkle proof index for `blob_kzg_commitments` |
 
 ### Configuration
 
@@ -55,7 +55,7 @@ class DataColumnSidecar(Container):
     kzg_commitments: List[KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK]
     kzg_proofs: List[KZGProof, MAX_BLOB_COMMITMENTS_PER_BLOCK]
     signed_block_header: SignedBeaconBlockHeader
-    kzg_commitments_merkle_proof: Vector[Bytes32, floorlog2(KZG_COMMITMENTS_MERKLE_PROOF_INDEX)]
+    kzg_commitments_inclusion_proof: Vector[Bytes32, KZG_COMMITMENTS_INCLUSION_PROOF_DEPTH]
 ```
 
 #### `DataColumnIdentifier`
@@ -112,11 +112,12 @@ def verify_data_column_sidecar_inclusion_proof(sidecar: DataColumnSidecar) -> bo
     """
     Verify if the given KZG commitments included in the given beacon block.
     """
+    gindex = get_subtree_index(get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'))
     return is_valid_merkle_branch(
         leaf=hash_tree_root(sidecar.kzg_commitments),
-        branch=sidecar.kzg_commitments_merkle_proof,
-        depth=floorlog2(KZG_COMMITMENTS_MERKLE_PROOF_INDEX),
-        index=KZG_COMMITMENTS_MERKLE_PROOF_INDEX,
+        branch=sidecar.kzg_commitments_inclusion_proof,
+        depth=KZG_COMMITMENTS_INCLUSION_PROOF_DEPTH,
+        index=gindex,
         root=sidecar.signed_block_header.message.body_root,
     )
 ```
@@ -160,7 +161,7 @@ The following validations MUST pass before forwarding the `sidecar: DataColumnSi
 - _[REJECT]_ The sidecar is proposed by the expected `proposer_index` for the block's slot in the context of the current shuffling (defined by `block_header.parent_root`/`block_header.slot`).
   If the `proposer_index` cannot immediately be verified against the expected shuffling, the sidecar MAY be queued for later processing while proposers for the block's branch are calculated -- in such a case _do not_ `REJECT`, instead `IGNORE` this message.
 
-*Note:* In the `verify_data_column_sidecar_inclusion_proof(sidecar)` check, it should verify against the same set of `kzg_commitments` of the given beacon beacon. Client can choose to cache the result of the arguments tuple `(sidecar.kzg_commitments, sidecar.kzg_commitments_merkle_proof, sidecar.signed_block_header)`.
+*Note:* In the `verify_data_column_sidecar_inclusion_proof(sidecar)` check, it should verify against the same set of `kzg_commitments` of the given beacon beacon. Client can choose to cache the result of the arguments tuple `(sidecar.kzg_commitments, sidecar.kzg_commitments_inclusion_proof, sidecar.signed_block_header)`.
 
 ### The Req/Resp domain
 

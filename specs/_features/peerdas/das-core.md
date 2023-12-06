@@ -112,27 +112,24 @@ def get_data_column_sidecars(signed_block: SignedBeaconBlock,
                              blobs: Sequence[Blob]) -> Sequence[DataColumnSidecar]:
     signed_block_header = compute_signed_block_header(signed_block)
     block = signed_block.message
-    kzg_commitment_merkle_proof = compute_merkle_proof(
+    kzg_commitments_inclusion_proof = compute_merkle_proof(
         block.body,
         get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'),
     )
-
-    all_cells_and_proofs = [compute_samples_and_proofs(blob) for blob in enumerate(blobs)]
-
+    cells, proofs = [compute_samples_and_proofs(blob) for blob in blobs]
     sidecars = []
     for column_index in range(NUMBER_OF_COLUMNS):
-        column = DataColumn([all_cells_and_proofs[0][column_index + MAX_BLOBS_PER_BLOCK * i]
-                             for i in MAX_BLOBS_PER_BLOCK])
-        kzg_proof_of_column = [all_cells_and_proofs[1][column_index + MAX_BLOBS_PER_BLOCK * i]
-                               for i in MAX_BLOBS_PER_BLOCK]
-
+        column = DataColumn([cells[0][column_index + MAX_BLOBS_PER_BLOCK * i]
+                             for i in range(MAX_BLOBS_PER_BLOCK)])
+        kzg_proof_of_column = [proofs[1][column_index + MAX_BLOBS_PER_BLOCK * i]
+                               for i in range(MAX_BLOBS_PER_BLOCK)]
         sidecars.append(DataColumnSidecar(
             index=column_index,
             column=column,
             kzg_commitments=block.body.blob_kzg_commitments,
             kzg_proofs=kzg_proof_of_column,
             signed_block_header=signed_block_header,
-            kzg_commitments_merkle_proof=kzg_commitment_merkle_proof,
+            kzg_commitments_inclusion_proof=kzg_commitments_inclusion_proof,
         ))
     return sidecars
 ```

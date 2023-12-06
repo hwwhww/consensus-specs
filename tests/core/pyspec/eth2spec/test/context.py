@@ -568,6 +568,7 @@ with_capella_and_later = with_all_phases_from(CAPELLA)
 with_deneb_and_later = with_all_phases_from(DENEB)
 with_eip6110_and_later = with_all_phases_from(EIP6110)
 with_eip7002_and_later = with_all_phases_from(EIP7002)
+with_peerdas_and_later = with_all_phases_from(PEERDAS)
 
 
 class quoted_str(str):

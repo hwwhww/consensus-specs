@@ -115,7 +115,7 @@ def get_data_column_sidecars(signed_block: SignedBeaconBlock,
     kzg_commitment_merkle_proof = compute_merkle_proof(
         block.body,
         get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'),
-    ),
+    )
 
     all_cells_and_proofs = [compute_samples_and_proofs(blob) for blob in enumerate(blobs)]
 
@@ -175,7 +175,7 @@ In this construction, we entend the blobs using one-dimension erasure coding ext
 
 ### Parameters
 
-For each column -- use `data_column_sidecar_{subnet_id}` subnets, where each column index maps to the `subnet_id`. The sidecars can be computed with `get_data_column_sidecars(signed_block: SignedBeaconBlock, blobs: Sequence[Blob])[]` helper.
+For each column -- use `data_column_sidecar_{subnet_id}` subnets, where each column index maps to the `subnet_id`. The sidecars can be computed with `get_data_column_sidecars(signed_block: SignedBeaconBlock, blobs: Sequence[Blob])` helper.
 
 To custody a particular column, a node joins the respective gossip subnet. Verifiable samples from their respective column are gossiped on the assigned subnet.
 
@@ -206,6 +206,8 @@ DAS providers can also be found out-of-band and configured into a node to connec
 Such direct peering utilizes a feature supported out of the box today on all nodes and can complement (and reduce attackability and increase quality-of-service) alternative peer discovery mechanisms.
 
 ## A note on fork choice
+
+*Fork choice spec TBD, but it will just be a replacement of `is_data_available()` call in Deneb with column sampling instead of full download. Note the `is_data_available(slot_N)` will likely do a `-1` follow distance so that you just need to check the availability of slot `N-1` for slot `N` (starting with the block proposer of `N`).*
 
 The fork choice rule (essentially a DA filter) is *orthogonal to a given DAS design*, other than the efficiency of a particular design impacting it.
 

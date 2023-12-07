@@ -45,8 +45,8 @@ We define the following Python custom types for type hinting and readability:
 | `DataCell`     | `Vector[BLSFieldElement, FIELD_ELEMENTS_PER_CELL]` | The data unit of a cell in the extended data matrix |
 | `DataColumn`   | `List[DataCell, MAX_BLOBS_PER_BLOCK]` | The data of each column in PeerDAS |
 | `ExtendedMatrix` | `List[DataCell, MAX_BLOBS_PER_BLOCK * NUMBER_OF_COLUMNS]` | The full data with blobs and one-dimension erasure coding extension |
-| `FlattenExtendedMatrix` | `List[BLSFieldElement, MAX_BLOBS_PER_BLOCK * FIELD_ELEMENTS_PER_BLOB * 2 * NUMBER_OF_COLUMNS]` | The flatten format of `ExtendedMatrix` |
-| `LineIndex`    | `uint64` | The index of the rows or columns in `FlattenExtendedMatrix` matrix |
+| `FlatExtendedMatrix` | `List[BLSFieldElement, MAX_BLOBS_PER_BLOCK * FIELD_ELEMENTS_PER_BLOB * NUMBER_OF_COLUMNS]` | The flatten format of `ExtendedMatrix` |
+| `LineIndex`    | `uint64` | The index of the rows or columns in `FlatExtendedMatrix` matrix |
 
 ## Configuration
 
@@ -54,8 +54,8 @@ We define the following Python custom types for type hinting and readability:
 
 | Name | Value | Description |
 | - | - | - |
-| `NUMBER_OF_COLUMNS` | `uint64(2**6)` (= 32) | Number of columns in the extended data matrix. Invariant: `assert FIELD_ELEMENTS_PER_BLOB * 2 % NUMBER_OF_COLUMNS == 0` |
-| `FIELD_ELEMENTS_PER_CELL` | `FIELD_ELEMENTS_PER_BLOB * 2 // NUMBER_OF_COLUMNS` | Elements per `DataCell` |
+| `FIELD_ELEMENTS_PER_CELL` | `uint64(2**6)` (= 64)  | Elements per `DataCell` |
+| `NUMBER_OF_COLUMNS` | `uint64((FIELD_ELEMENTS_PER_BLOB * 2) // FIELD_ELEMENTS_PER_CELL)` (= 128) | Number of columns in the extended data matrix. |
 
 ### Custody setting
 
@@ -82,26 +82,28 @@ def get_custody_lines(node_id: NodeID, epoch: Epoch, custody_size: uint64) -> Se
 ```python
 def compute_extended_data(data: Sequence[BLSFieldElement]) -> Sequence[BLSFieldElement]:
     # TODO
+    # pylint: disable=unused-argument
     ...
 ```
 
 #### `compute_extended_matrix`
 
 ```python
-def compute_extended_matrix(blobs: Sequence[Blob]) -> FlattenExtendedMatrix:
+def compute_extended_matrix(blobs: Sequence[Blob]) -> FlatExtendedMatrix:
     matrix = [compute_extended_data(blob) for blob in blobs]
-    return FlattenExtendedMatrix(matrix)
+    return FlatExtendedMatrix(matrix)
 ```
 
 #### `compute_samples_and_proofs`
 
 ```python
 def compute_samples_and_proofs(blob: Blob) -> Tuple[
-        Vector[DataCell, NUMBER_OF_COLUMNS * 2],
-        Vector[KZGProof, NUMBER_OF_COLUMNS * 2]]:
+        Vector[DataCell, NUMBER_OF_COLUMNS],
+        Vector[KZGProof, NUMBER_OF_COLUMNS]]:
     """
     Defined in polynomial-commitments-sampling.md
     """
+    # pylint: disable=unused-argument
     ...
 ```
 

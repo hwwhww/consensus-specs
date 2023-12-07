@@ -80,6 +80,7 @@ def verify_sample_proof_batch(
     """
     Defined in polynomial-commitments-sampling.md
     """
+    # pylint: disable=unused-argument
     ...
 ```
 
@@ -90,15 +91,16 @@ def verify_data_column_sidecar_kzg_proof(sidecar: DataColumnSidecar) -> bool:
     """
     Verify if the commitment are correct
     """
+    row_ids = [LineIndex(i) for i in range(len(sidecar.column))]
     column = sidecar.column
     cell_count = len(column) // FIELD_ELEMENTS_PER_CELL
     cells = [column[i * FIELD_ELEMENTS_PER_CELL:(i + 1) * FIELD_ELEMENTS_PER_CELL] for i in range(cell_count)]
-
     assert len(cells) == len(sidecar.kzg_commitments) == len(sidecar.kzg_proofs)
+
     # KZG batch verify the cells match the corresponding commitments and proofs
     return verify_sample_proof_batch(
         row_commitments=sidecar.kzg_commitments,
-        row_ids=list(range(sidecar.column)),  # all rows
+        row_ids=row_ids,  # all rows
         column_ids=[sidecar.index],
         datas=cells,
         proofs=sidecar.kzg_proofs

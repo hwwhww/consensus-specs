@@ -121,9 +121,9 @@ def get_data_column_sidecars(signed_block: SignedBeaconBlock,
     cells, proofs = [compute_samples_and_proofs(blob) for blob in blobs]
     sidecars = []
     for column_index in range(NUMBER_OF_COLUMNS):
-        column = DataColumn([cells[0][column_index + MAX_BLOBS_PER_BLOCK * i]
+        column = DataColumn([cells[0][column_index + NUMBER_OF_COLUMNS * i]
                              for i in range(MAX_BLOBS_PER_BLOCK)])
-        kzg_proof_of_column = [proofs[1][column_index + MAX_BLOBS_PER_BLOCK * i]
+        kzg_proof_of_column = [proofs[1][column_index + NUMBER_OF_COLUMNS * i]
                                for i in range(MAX_BLOBS_PER_BLOCK)]
         sidecars.append(DataColumnSidecar(
             index=column_index,

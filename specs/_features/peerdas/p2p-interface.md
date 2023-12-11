@@ -89,7 +89,7 @@ def verify_sample_proof_batch(
 ```python
 def verify_data_column_sidecar_kzg_proof(sidecar: DataColumnSidecar) -> bool:
     """
-    Verify if the commitment are correct
+    Verify if the proofs are correct
     """
     row_ids = [LineIndex(i) for i in range(len(sidecar.column))]
     column = sidecar.column
@@ -144,9 +144,9 @@ Some gossip meshes are upgraded in the fork of Pe to support upgraded types.
 
 This topic is used to propagate column sidecars, where each column maps to some `subnet_id`.
 
-The *type* of the payload of this topic is `DataColumn`.
+The *type* of the payload of this topic is `DataColumnSidecar`.
 
-The following validations MUST pass before forwarding the `sidecar: DataColumnSidecar` on the network, assuming the alias `block_header = blob_sidecar.signed_block_header.message`:
+The following validations MUST pass before forwarding the `sidecar: DataColumnSidecar` on the network, assuming the alias `block_header = sidecar.signed_block_header.message`:
 
 - _[REJECT]_ The sidecar's index is consistent with `NUMBER_OF_COLUMNS` -- i.e. `sidecar.index < NUMBER_OF_COLUMNS`.
 - _[REJECT]_ The sidecar is for the correct subnet -- i.e. `compute_subnet_for_data_column_sidecar(blob_sidecar.index) == subnet_id`.

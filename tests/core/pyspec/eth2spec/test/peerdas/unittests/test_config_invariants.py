@@ -14,3 +14,4 @@ def test_invariants(spec):
     assert spec.SAMPLES_PER_SLOT <= spec.NUMBER_OF_COLUMNS
     assert spec.CUSTODY_REQUIREMENT <= spec.NUMBER_OF_COLUMNS
     assert spec.DATA_COLUMN_SIDECAR_SUBNET_COUNT <= spec.NUMBER_OF_COLUMNS
+    assert spec.NUMBER_OF_COLUMNS % spec.DATA_COLUMN_SIDECAR_SUBNET_COUNT == 0

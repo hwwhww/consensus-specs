@@ -56,6 +56,7 @@ def _run_blob_kzg_commitments_merkle_proof_test(spec, state, rng=None):
         index=spec.get_subtree_index(gindex),
         root=column_sidcar.signed_block_header.message.body_root,
     )
+    assert spec.verify_data_column_sidecar_inclusion_proof(column_sidcar)
 
 
 @with_test_suite_name("BeaconBlockBody")

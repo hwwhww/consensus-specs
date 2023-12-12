@@ -71,9 +71,9 @@ We define the following Python custom types for type hinting and readability:
 
 ```python
 def get_custody_lines(node_id: NodeID, epoch: Epoch, custody_size: uint64) -> Sequence[LineIndex]:
-    assert custody_size <= MAX_BLOBS_PER_BLOCK
-    all_items = list(range(MAX_BLOBS_PER_BLOCK))
-    line_index = (node_id + epoch) % MAX_BLOBS_PER_BLOCK
+    assert custody_size <= NUMBER_OF_COLUMNS
+    all_items = list(range(NUMBER_OF_COLUMNS))
+    line_index = (node_id + epoch) % NUMBER_OF_COLUMNS
     return [LineIndex(all_items[(line_index + i) % len(all_items)]) for i in range(custody_size)]
 ```
 
@@ -119,10 +119,10 @@ def get_data_column_sidecars(signed_block: SignedBeaconBlock,
         get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'),
     )
     cells_and_proofs = [compute_samples_and_proofs(blob) for blob in blobs]
+    blob_count = len(blobs)
     cells = [cells_and_proofs[i][0] for i in range(blob_count)]
     proofs = [cells_and_proofs[i][1] for i in range(blob_count)]
     sidecars = []
-    blob_count = len(blobs)
     for column_index in range(NUMBER_OF_COLUMNS):
         column = DataColumn([cells[row_index][column_index]
                              for row_index in range(blob_count)])

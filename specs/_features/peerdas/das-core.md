@@ -44,8 +44,8 @@ We define the following Python custom types for type hinting and readability:
 | - | - | - |
 | `DataCell`     | `Vector[BLSFieldElement, FIELD_ELEMENTS_PER_CELL]` | The data unit of a cell in the extended data matrix |
 | `DataColumn`   | `List[DataCell, MAX_BLOBS_PER_BLOCK]` | The data of each column in PeerDAS |
-| `ExtendedMatrix` | `List[DataCell, MAX_BLOBS_PER_BLOCK * NUMBER_OF_COLUMNS]` | The full data with blobs and one-dimension erasure coding extension |
-| `FlatExtendedMatrix` | `List[BLSFieldElement, MAX_BLOBS_PER_BLOCK * FIELD_ELEMENTS_PER_BLOB * NUMBER_OF_COLUMNS]` | The flatten format of `ExtendedMatrix` |
+| `ExtendedMatrix` | `List[DataCell, MAX_BLOBS_PER_BLOCK * NUMBER_OF_COLUMNS]` | The full data with blobs and one-dimensional erasure coding extension |
+| `FlatExtendedMatrix` | `List[BLSFieldElement, MAX_BLOBS_PER_BLOCK * FIELD_ELEMENTS_PER_BLOB * NUMBER_OF_COLUMNS]` | The flattened format of `ExtendedMatrix` |
 | `LineIndex`    | `uint64` | The index of the rows or columns in `FlatExtendedMatrix` matrix |
 
 ## Configuration
@@ -62,7 +62,7 @@ We define the following Python custom types for type hinting and readability:
 | Name | Value | Description |
 | - | - | - |
 | `SAMPLES_PER_SLOT` | `8` | Number of random samples a node queries per slot |
-| `CUSTODY_REQUIREMENT` | `2` | Minimum number columns an honest node custodies and serves samples from |
+| `CUSTODY_REQUIREMENT` | `2` | Minimum number of columns an honest node custodies and serves samples from |
 | `TARGET_NUMBER_OF_PEERS` | `70` | Suggested minimum peer count |
 
 ### Helper functions

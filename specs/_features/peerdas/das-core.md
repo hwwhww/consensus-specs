@@ -118,13 +118,16 @@ def get_data_column_sidecars(signed_block: SignedBeaconBlock,
         block.body,
         get_generalized_index(BeaconBlockBody, 'blob_kzg_commitments'),
     )
-    cells, proofs = [compute_samples_and_proofs(blob) for blob in blobs]
+    cells_and_proofs = [compute_samples_and_proofs(blob) for blob in blobs]
+    cells = [cells_and_proofs[i][0] for i in range(blob_count)]
+    proofs = [cells_and_proofs[i][1] for i in range(blob_count)]
     sidecars = []
+    blob_count = len(blobs)
     for column_index in range(NUMBER_OF_COLUMNS):
-        column = DataColumn([cells[0][column_index + NUMBER_OF_COLUMNS * i]
-                             for i in range(MAX_BLOBS_PER_BLOCK)])
-        kzg_proof_of_column = [proofs[1][column_index + NUMBER_OF_COLUMNS * i]
-                               for i in range(MAX_BLOBS_PER_BLOCK)]
+        column = DataColumn([cells[row_index][column_index]
+                             for row_index in range(blob_count)])
+        kzg_proof_of_column = [proofs[row_index][column_index]
+                               for row_index in range(blob_count)]
         sidecars.append(DataColumnSidecar(
             index=column_index,
             column=column,
@@ -168,7 +171,7 @@ A node runs a background peer discovery process, maintaining at least `TARGET_NU
 
 ## Extended data
 
-In this construction, we entend the blobs using one-dimension erasure coding extension. The matrix comprises maximum `MAX_BLOBS_PER_BLOCK` rows and fixed `NUMBER_OF_COLUMNS` columns, with each row containing a `Blob` and its corresponding extension.
+In this construction, we extend the blobs using a one-dimensional erasure coding extension. The matrix comprises maximum `MAX_BLOBS_PER_BLOCK` rows and fixed `NUMBER_OF_COLUMNS` columns, with each row containing a `Blob` and its corresponding extension.
 
 ## Column gossip
 

@@ -70,10 +70,10 @@ We define the following Python custom types for type hinting and readability:
 #### `get_custody_lines`
 
 ```python
-def get_custody_lines(node_id: NodeID, epoch: Epoch, custody_size: uint64) -> Sequence[LineIndex]:
+def get_custody_lines(node_id: NodeID, custody_size: uint64) -> Sequence[LineIndex]:
     assert custody_size <= NUMBER_OF_COLUMNS
     all_items = list(range(NUMBER_OF_COLUMNS))
-    line_index = (node_id + epoch) % NUMBER_OF_COLUMNS
+    line_index = node_id % NUMBER_OF_COLUMNS
     return [LineIndex(all_items[(line_index + i) % len(all_items)]) for i in range(custody_size)]
 ```
 
@@ -149,13 +149,11 @@ A node *may* choose to custody and serve more than the minimum honesty requireme
 
 A node stores the custodied columns for the duration of the pruning period and responds to peer requests for samples on those columns.
 
-### Public, deterministic selection 
+### Public, deterministic selection
 
-The particular columns that a node custodies are selected pseudo-randomly as a function (`get_custody_lines`) of the node-id, epoch, and custody size -- importantly this function can be run by any party as the inputs are all public.
+The particular columns that a node custodies are selected pseudo-randomly as a function (`get_custody_lines`) of the node-id and custody size -- importantly this function can be run by any party as the inputs are all public.
 
-*Note*: increasing the `custody_size` parameter for a given `node_id` and `epoch` extends the returned list (rather than being an entirely new shuffle) such that if `custody_size` is unknown, the default `CUSTODY_REQUIREMENT` will be correct for a subset of the node's custody.
-
-*Note*: Even though this function accepts `epoch` as an input, the function can be tuned to remain stable for many epochs depending on network/subnet stability requirements. There is a trade-off between the rigidity of the network and the depth to which a subnet can be utilized for recovery. To ensure subnets can be utilized for recovery, staggered rotation likely needs to happen on the order of the pruning period.
+*Note*: increasing the `custody_size` parameter for a given `node_id` extends the returned list (rather than being an entirely new shuffle) such that if `custody_size` is unknown, the default `CUSTODY_REQUIREMENT` will be correct for a subset of the node's custody.
 
 ## Peer discovery
 
@@ -235,3 +233,8 @@ The potential benefits of having row custody could include:
 2. Help with some sort of distributed reconstruction. Those with full rows can compute extensions and seed missing samples to the network. This would either need to be able to send individual points on the gossip or would need some sort of req/resp faculty, potentially similar to an `IHAVEPOINTBITFIELD` and `IWANTSAMPLE`.
 
 However, for simplicity, we don't assign row custody assignments to nodes in the current design.
+
+
+### Subnet stability
+
+To start with a simple, stable backbone, for now, we don't shuffle the subnet assignments via the deterministic custody selection helper `get_custody_lines`. However, staggered rotation likely needs to happen on the order of the pruning period to ensure subnets can be utilized for recovery. For example, introducing an `epoch` argument allows the function to maintain stability over many epochs.

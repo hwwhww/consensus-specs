@@ -16,8 +16,8 @@ def test_get_custody_lines_peers_within_number_of_columns(spec):
     assert spec.NUMBER_OF_COLUMNS > peer_count
     assignments = [spec.get_custody_lines(node_id, epoch, custody_size) for node_id in range(peer_count)]
 
-    for assingment in assignments:
-        assert len(assingment) == custody_size
+    for assignment in assignments:
+        assert len(assignment) == custody_size
 
 
 @with_peerdas_and_later
